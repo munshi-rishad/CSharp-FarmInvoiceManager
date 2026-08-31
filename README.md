@@ -1,4 +1,4 @@
-# FarmInvoiceManager-Repository
+# FarmInvoiceManager
 
 This is a C# project for managing farm invoices. It is integrated with Microsoft SQL Server for data management.
 
