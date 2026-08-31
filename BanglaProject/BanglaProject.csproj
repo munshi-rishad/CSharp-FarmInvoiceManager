@@ -34,7 +34,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>0 %281%29.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\Branding\farm_logo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -222,11 +222,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\icons8-add-48.png" />
+    <None Include="Assets\Icons\icon_add.png" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="0 %281%29.ico" />
-    <None Include="Icon And BG\icons8-back-30.png" />
+    <None Include="Assets\Icons\icon_back.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

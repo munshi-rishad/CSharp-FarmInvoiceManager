@@ -22,58 +22,58 @@ Once configured, you can use the system to generate invoices, manage customers, 
 ## Farm Invoice Manager - User Interface Screenshots
 
 1. **Login Page**  
-   ![Screenshot 1](Screenshort/Screenshot_1.png)
+   ![Screenshot 1](Screenshots/01_Login_Page.png)
 
 2. **Find Password**  
-   ![Screenshot 2](Screenshort/Screenshot_2.png)
+   ![Screenshot 2](Screenshots/02_Find_Password.png)
 
 3. **Dashboard**  
-   ![Screenshot 3](Screenshort/Screenshot_3.png)
+   ![Screenshot 3](Screenshots/03_Admin_Dashboard.png)
 
 4. **Add User**  
-   ![Screenshot 4](Screenshort/Screenshot_4.png)
+   ![Screenshot 4](Screenshots/04_Add_User.png)
 
 5. **Edit Existing User**  
-   ![Screenshot 5](Screenshort/Screenshot_5.png)
+   ![Screenshot 5](Screenshots/05_Edit_Existing_User.png)
 
 6. **Manage Product**  
-   ![Screenshot 6](Screenshort/Screenshot_6.png)
+   ![Screenshot 6](Screenshots/06_Manage_Product.png)
 
 7. **Add Product**  
-   ![Screenshot 7](Screenshort/Screenshot_7.png)
+   ![Screenshot 7](Screenshots/07_Add_Product.png)
 
 8. **Update Product**  
-   ![Screenshot 8](Screenshort/Screenshot_8.png)
+   ![Screenshot 8](Screenshots/08_Update_Product.png)
 
 9. **Personal Information (Employee View)**  
-   ![Screenshot 9](Screenshort/Screenshot_9.png)
+   ![Screenshot 9](Screenshots/09_Admin_Personal_Information.png)
 
 10. **Show Customer**  
-    ![Screenshot 10](Screenshort/Screenshot_10.png)
+    ![Screenshot 10](Screenshots/10_Show_Customer.png)
 
 11. **Reset Username and Password**  
-    ![Screenshot 11](Screenshort/Screenshot_11.png)
+    ![Screenshot 11](Screenshots/11_Reset_Username_Password.png)
 
 12. **Add Premium Customer**  
-    ![Screenshot 12](Screenshort/Screenshot_12.png)
+    ![Screenshot 12](Screenshots/12_Add_Premium_Customer.png)
 
 13. **Add Sales**  
-    ![Screenshot 13](Screenshort/Screenshot_13.png)
+    ![Screenshot 13](Screenshots/13_Add_Sales.png)
 
 14. **Invoice**  
-    ![Screenshot 14](Screenshort/Screenshot_14.png)
+    ![Screenshot 14](Screenshots/14_Invoice.png)
 
 15. **Sales Report**  
-    ![Screenshot 15](Screenshort/Screenshot_15.png)
+    ![Screenshot 15](Screenshots/15_Sales_Report.png)
 
 16. **Employee Dashboard**  
-    ![Screenshot 16](Screenshort/Screenshot_16.png)
+    ![Screenshot 16](Screenshots/16_Employee_Dashboard.png)
 
 17. **Personal Information (Employee View)**  
-    ![Screenshot 17](Screenshort/Screenshot_17.png)
+    ![Screenshot 17](Screenshots/17_Employee_Personal_Information.png)
 
 18. **Employee Show Customer**  
-    ![Screenshot 18](Screenshort/Screenshot_18.png)
+    ![Screenshot 18](Screenshots/18_Employee_Show_Customer.png)
 ## How to Use
 1. Clone the repository to your local machine:
    ```bash
