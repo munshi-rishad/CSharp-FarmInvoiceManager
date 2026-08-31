@@ -77,4 +77,4 @@ Once configured, you can use the system to generate invoices, manage customers, 
 ## How to Use
 1. Clone the repository to your local machine:
    ```bash
-   git clone https://github.com/munshi-rishad/FarmInvoiceManager-Repository.git
+   git clone https://github.com/munshi-rishad/CSharp-FarmInvoiceManager-Repository.git
