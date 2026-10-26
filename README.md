@@ -48,7 +48,8 @@ CSharp-FarmInvoiceManager/
 ├── Database/
 │   └── FarmInvoiceManager.sql      # creates the database, tables and sample data
 ├── Documentation/
-│   └── Project_Report.pdf
+│   ├── Project_Report.pdf          # compiled report
+│   └── Report/                     # LaTeX source of the report
 └── Screenshots/
 ```
 
@@ -100,7 +101,7 @@ You can also log in with the User ID (`A-001`, `E-004`) instead of the username.
 
 ## Project Report
 
-[Project_Report.pdf](Documentation/Project_Report.pdf)
+[Project_Report.pdf](Documentation/Project_Report.pdf) – written in LaTeX (source in `Documentation/Report/`, build with `latexmk -pdf main.tex`).
 
 ## Screenshots
 

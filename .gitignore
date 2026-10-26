@@ -6,3 +6,12 @@ obj/
 # User-specific files
 *.user
 *.suo
+
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+Documentation/Report/main.pdf
