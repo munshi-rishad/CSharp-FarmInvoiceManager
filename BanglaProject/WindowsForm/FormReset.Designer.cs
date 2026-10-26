@@ -325,7 +325,6 @@
             this.Controls.Add(this.panel1);
             this.Name = "FormReset";
             this.Text = "FormReset";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormReset_FormClosing);
             this.Load += new System.EventHandler(this.FormReset_Load);
             this.pnlReset.ResumeLayout(false);
             this.pnlReset.PerformLayout();

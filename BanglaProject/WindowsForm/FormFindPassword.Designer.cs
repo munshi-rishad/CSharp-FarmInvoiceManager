@@ -325,8 +325,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormFindPassword";
             this.Text = "FormFindPassword";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormFindPassword_FormClosing);
-            this.Load += new System.EventHandler(this.FormFindPassword_Load);
             this.panel1.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
             this.panel2.PerformLayout();

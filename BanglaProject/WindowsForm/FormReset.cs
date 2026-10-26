@@ -1,218 +1,109 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using BanglaProject.DataBase;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
+using BanglaProject.Validation;
 
 namespace BanglaProject.WindowsForm
 {
-    public partial class FormReset : Form
+    // Lets the logged in admin or employee change their own username and password
+    public partial class FormReset : BaseForm
     {
+        private readonly Form dashboard;   // admin or employee dashboard to go back to
+        private readonly string userId;
+
         public FormReset()
         {
             InitializeComponent();
-
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-
-
-
-            lblNewUsernameError.Text = "";
-            lblNewUsernameError.Visible = false;
-
-            lblNewPasswordError.Text = "";
-            lblNewPasswordError.Visible = false;
-
+            ValidationLabel.Reset(lblNewUsernameError, lblNewPasswordError);
         }
 
-        private FormAdminView AdminView { get; set; }
-        private FormEmployee Employee { get; set; }
-        private DataBaseConnection DbConnection { get; set; }
-        private string UserId { get; set; }
-
-        public FormReset(DataBaseConnection dbConnection, string userId, FormAdminView adminView) : this()
+        public FormReset(string userId, Form dashboard) : this()
         {
-            this.DbConnection = dbConnection;
-            this.UserId = userId;
-            this.AdminView = adminView;
+            this.userId = userId;
+            this.dashboard = dashboard;
         }
 
-        public FormReset(DataBaseConnection dbConnection, string userId, FormEmployee employee) : this()
-        {
-            this.DbConnection = dbConnection;
-            this.UserId = userId;
-            this.Employee = employee;
-        }
-
-
-        private void CurrentInfo()
+        private void FormReset_Load(object sender, EventArgs e)
         {
             try
             {
-                string sql = $@"select USERNAME, PASSWORD from UserInfo 
-                        where USER_ID = '{this.UserId}';";
+                DataTable user = Db.GetTable("SELECT USERNAME, PASSWORD FROM UserInfo WHERE USER_ID = @ID", Db.P("@ID", userId));
 
-                var dataTable = this.DbConnection.ExecuteQueryTable(sql);
-                if (dataTable.Rows.Count == 1)
+                if (user.Rows.Count == 1)
                 {
-                    this.txtCurrentUsername.Text = dataTable.Rows[0]["USERNAME"].ToString();
-                    this.txtCurrentPassword.Text = dataTable.Rows[0]["PASSWORD"].ToString();
+                    txtCurrentUsername.Text = user.Rows[0]["USERNAME"].ToString();
+                    txtCurrentPassword.Text = user.Rows[0]["PASSWORD"].ToString();
                 }
                 else
                 {
-                    MessageBox.Show(
-                    "Unable to find the current user information.",
-                    "User Not Found",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                    );
+                    Msg.Warning("Unable to find the current user information.", "User Not Found");
                 }
             }
             catch (Exception ex)
             {
-                    MessageBox.Show(
-                    "An unexpected error occurred.\n\nDetails: " + ex.Message,
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-);
+                Msg.DatabaseError(ex);
+            }
+        }
+
+        private void txtNewUsername_TextChanged(object sender, EventArgs e)
+        {
+            UserValidator.ValidateUsername(txtNewUsername, lblNewUsernameError);
+        }
+
+        private void txtNewPassword_TextChanged(object sender, EventArgs e)
+        {
+            UserValidator.ValidatePassword(txtNewPassword, lblNewPasswordError);
+        }
+
+        private void btnUpdate_Click(object sender, EventArgs e)
+        {
+            if (txtCurrentUsername.Text.Trim() == "" || txtCurrentPassword.Text == "")
+            {
+                Msg.Warning("Please enter your current username and password.", "Missing Information");
+                return;
+            }
+
+            bool usernameOk = UserValidator.ValidateUsername(txtNewUsername, lblNewUsernameError);
+            bool passwordOk = UserValidator.ValidatePassword(txtNewPassword, lblNewPasswordError);
+            if (!usernameOk || !passwordOk)
+            {
+                Msg.Warning("Please fix the new username and password before saving.", "Validation Error");
+                return;
+            }
+
+            try
+            {
+                // the current username and password must still be correct
+                int count = Db.Execute(
+                    "UPDATE UserInfo SET USERNAME = @NewUser, PASSWORD = @NewPassword " +
+                    "WHERE USER_ID = @ID AND USERNAME = @OldUser AND PASSWORD = @OldPassword",
+                    Db.P("@NewUser", txtNewUsername.Text.Trim()),
+                    Db.P("@NewPassword", txtNewPassword.Text),
+                    Db.P("@ID", userId),
+                    Db.P("@OldUser", txtCurrentUsername.Text.Trim()),
+                    Db.P("@OldPassword", txtCurrentPassword.Text));
+
+                if (count == 1)
+                {
+                    Msg.Info("Your username and password have been updated successfully.", "Update Successful");
+                    GoTo(dashboard);
+                }
+                else
+                {
+                    Msg.Warning("The current username or password you entered is incorrect.", "Update Failed");
+                }
+            }
+            catch (Exception ex)
+            {
+                Msg.DatabaseError(ex);
             }
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
-            if (this.AdminView != null)
-            {
-                this.Visible = false;
-                AdminView.Visible = true;
-            }
-            else if (this.Employee != null)
-            {
-                this.Employee.Visible = true;
-                this.Visible = false;
-            }
-        }
-
-        private void btnUpdate_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtCurrentUsername.Text) ||
-                   string.IsNullOrWhiteSpace(txtCurrentPassword.Text))
-            {
-                MessageBox.Show(
-                    "Please enter your current username and password.",
-                    "Missing Information",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-                return;
-            }
-            if (lblNewUsernameError.Visible && lblNewUsernameError.ForeColor == Color.Red)
-            {
-                MessageBox.Show(
-                    "Please fix the Username field before saving.",
-                    "Validation Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-                return;
-            }
-            if (lblNewPasswordError.Visible && lblNewPasswordError.ForeColor == Color.Red)
-            {
-                MessageBox.Show(
-                    "Please fix the Password field before saving.",
-                    "Validation Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-                return;
-            }
-            try
-            {
-                string newUserName = this.txtNewUsername.Text.ToString();
-                string newPassword = this.txtNewPassword.Text.ToString();
-
-                string updateQuery = $@"
-                UPDATE UserInfo
-               SET USERNAME ='{newUserName}', PASSWORD='{newPassword}'
-               WHERE USERNAME = '{this.txtCurrentUsername.Text}' and PASSWORD = '{this.txtCurrentPassword.Text}';";
-
-                
-
-                int count = this.DbConnection.ExecuteDMLQuery(updateQuery);
-                if (count == 1)
-                {
-                    MessageBox.Show(
-                    "Your username and password have been updated successfully.",
-                    "Update Successful",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                    );
-                    this.Visible = false;
-
-                    if (this.AdminView != null)
-                    {
-                        AdminView.Visible = true;
-                    }
-                    else if (this.Employee != null)
-                    {
-                        Employee.Visible = true;
-                    }
-
-                    return;
-                }
-                else
-                {
-                    MessageBox.Show(
-                    "The current username or password you entered is incorrect.",
-                    "Update Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-);
-
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Error");
-            }
-
-        }
-
-        private void FormReset_Load(object sender, EventArgs e)
-        {
-            this.CurrentInfo();
-        }
-
-        private void FormReset_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-                                    "Are you sure you want to close the application?",
-                                    "Confirm Exit",
-                                    MessageBoxButtons.YesNo,
-                                    MessageBoxIcon.Question
-);
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
-        }
-
-        private void txtNewPassword_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorUser.ValidatePassword(txtNewPassword, lblNewPasswordError);
-        }
-
-        private void txtNewUsername_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorUser.ValidateUsername(txtNewUsername, lblNewUsernameError);
+            GoTo(dashboard);
         }
     }
 }

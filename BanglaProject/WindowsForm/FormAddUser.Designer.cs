@@ -212,7 +212,6 @@
             this.chkIsActive.TabIndex = 47;
             this.chkIsActive.Text = "Active";
             this.chkIsActive.UseVisualStyleBackColor = true;
-            this.chkIsActive.CheckedChanged += new System.EventHandler(this.chkIsActive_CheckedChanged);
             // 
             // cmbRole
             // 
@@ -220,7 +219,7 @@
             this.cmbRole.Font = new System.Drawing.Font("Segoe UI", 8.25F);
             this.cmbRole.FormattingEnabled = true;
             this.cmbRole.Items.AddRange(new object[] {
-            "Empolyee",
+            "Employee",
             "Admin"});
             this.cmbRole.Location = new System.Drawing.Point(102, 383);
             this.cmbRole.Name = "cmbRole";
@@ -508,7 +507,6 @@
             this.Name = "FormAddUser";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "FormAddUser";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormAddUser_FormClosing);
             this.Load += new System.EventHandler(this.FormAddUser_Load);
             this.panelTitleNameAdmin.ResumeLayout(false);
             this.panelTitleNameAdmin.PerformLayout();

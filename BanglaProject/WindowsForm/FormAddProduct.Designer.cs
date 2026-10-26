@@ -463,7 +463,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormAddProduct";
             this.Text = "FormAddProduct";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormAddProduct_FormClosing);
             this.Load += new System.EventHandler(this.FormAddProduct_Load);
             this.panel1.ResumeLayout(false);
             this.panel2.ResumeLayout(false);

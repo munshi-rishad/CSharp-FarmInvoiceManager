@@ -1,194 +1,87 @@
-﻿using BanglaProject.DataBase;
-using System;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
-using System.Windows.Forms;
+﻿using System;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
+using BanglaProject.Validation;
 
 namespace BanglaProject
 {
-    public partial class FormAddCustomer : Form
+    // Adds a premium customer (ID PC-001, PC-002 ...) from the Add Sales form
+    public partial class FormAddCustomer : BaseForm
     {
+        private readonly FormAddSales addSales;
+
         public FormAddCustomer()
         {
             InitializeComponent();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-            ClearErrorMessages();
         }
 
-        private FormAddSales AddSales { get; set; }   
-        private DataBaseConnection DbConnection { get; set; }
-
-        public FormAddCustomer(DataBaseConnection dbConnection, FormAddSales addSales) : this()
+        public FormAddCustomer(FormAddSales addSales) : this()
         {
-            this.AddSales = addSales;
-            this.DbConnection = dbConnection;
-        }
-
-        private void ClearErrorMessages()
-        {
-            lblFullNameError.Text = "";
-            lblMobileError.Text = "";
-
-            lblFullNameError.Visible = false;
-            lblMobileError.Visible = false;
-        }
-
-        private void btnBack_Click(object sender, EventArgs e)
-        {
-                this.Visible = false;
-                this.AddSales.Visible = true;
+            this.addSales = addSales;
         }
 
         private void FormAddCustomer_Load(object sender, EventArgs e)
         {
-            ClearErrorMessages();
+            ValidationLabel.Reset(lblFullNameError, lblMobileError);
         }
 
-        private void FormAddCustomer_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-                "Are you sure you want to close the application?",
-                "Confirm Exit",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question
-            );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
-        }
-
-        private void txtCustomerName_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorUser.ValidateFullName(txtCustomerName, lblFullNameError);
-        }
-
-        private void txtMobile_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorUser.ValidateMobile(txtMobile, lblMobileError);
-        }
-
-        private void btnClear_Click(object sender, EventArgs e)
-        {
-            ClearErrorMessages();
-            txtCustomerName.Clear();
-            txtMobile.Clear();
-        }
+        private void txtCustomerName_TextChanged(object sender, EventArgs e) => UserValidator.ValidateFullName(txtCustomerName, lblFullNameError);
+        private void txtMobile_TextChanged(object sender, EventArgs e) => UserValidator.ValidateMobile(txtMobile, lblMobileError);
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            if (lblFullNameError.Visible && lblFullNameError.ForeColor == Color.Red)
+            bool nameOk = UserValidator.ValidateFullName(txtCustomerName, lblFullNameError);
+            bool mobileOk = UserValidator.ValidateMobile(txtMobile, lblMobileError);
+            if (!nameOk || !mobileOk)
             {
-                MessageBox.Show("Fix Customer Name.", "Validation Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Warning("Please fill the customer name and mobile number correctly.", "Validation Error");
                 return;
             }
 
-            if (lblMobileError.Visible && lblMobileError.ForeColor == Color.Red)
-            {
-                MessageBox.Show("Fix Mobile Number.", "Validation Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            //bool nameOk = InputValidatorUser.ValidateFullName(txtCustomerName, lblFullNameError);
-            //bool mobileOk = InputValidatorUser.ValidateMobile(txtMobile, lblMobileError);
-
-            //if (!(nameOk && mobileOk))
-            //{
-            //    MessageBox.Show("Fill fields correctly.", "Validation Error",
-            //        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            //    return;
-            //}
+            string name = txtCustomerName.Text.Trim();
+            string mobile = txtMobile.Text.Trim();
 
             try
             {
-                string CustomerQuery = "select max(CUSTOMER_ID) from CustomerInfo;";
-                string newCustomerId = this.autoGenarateID(CustomerQuery, "PC-");
-
-                string insertQuery = $@"
-                INSERT INTO CustomerInfo
-                ( CUSTOMER_ID, CUSTOMER_NAME, CUSTOMER_MOBILE)
-                VALUES
-                ('{newCustomerId}','{this.txtCustomerName.Text}',
-                '{this.txtMobile.Text}');";
-
-                var count = this.DbConnection.ExecuteDMLQuery(insertQuery);
-                if (count == 1)
+                object exists = Db.Scalar("SELECT COUNT(*) FROM CustomerInfo WHERE CUSTOMER_MOBILE = @Mobile", Db.P("@Mobile", mobile));
+                if (Convert.ToInt32(exists) > 0)
                 {
-                    MessageBox.Show("Customer saved!", "Success",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                    btnClear_Click(sender, e);
-
-                    this.AddSales.Visible = true;
-                    this.Visible = false;
+                    Msg.Warning("A customer with this mobile number already exists.", "Duplicate Customer");
                     return;
                 }
-                else
-                {
-                    MessageBox.Show("Insert failed!", "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
 
+                string customerId = Db.NextId("CustomerInfo", "CUSTOMER_ID", "PC-");
+                Db.Execute("INSERT INTO CustomerInfo (CUSTOMER_ID, CUSTOMER_NAME, CUSTOMER_MOBILE) VALUES (@ID, @Name, @Mobile)",
+                           Db.P("@ID", customerId), Db.P("@Name", name), Db.P("@Mobile", mobile));
+
+                Msg.Info("Customer saved! Customer ID: " + customerId, "Success");
+                ClearForm();
+
+                // the new customer is selected on the sales form straight away
+                addSales.ReloadCustomers(mobile);
+                GoTo(addSales);
             }
-            
-            
             catch (Exception ex)
             {
-                MessageBox.Show("An error occurred!\n" + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.DatabaseError(ex);
             }
         }
 
-        //eta style cng korte hbe pore
-        //private string GenerateCustomerId_Global()
-        //{
-        //    string sql = @"
-        //            SELECT ISNULL(MAX(CAST(SUBSTRING(CUSTOMER_ID,3,10) AS INT)),0)
-        //            FROM dbo.CustomerInfo
-        //            WHERE CUSTOMER_ID LIKE 'C-%'";
-
-        //    object res = DbConnection.ExecuteScalarQuery(sql);
-
-        //    int last = 0;
-        //    if (res != null && res != DBNull.Value)
-        //        int.TryParse(res.ToString(), out last);
-
-        //    int next = last + 1;
-
-        //    return "C-" + next.ToString("D3");
-        //}
-        private string autoGenarateID(string sql, string prefix)
+        private void ClearForm()
         {
-            var newId = "";
-            string query = sql;
-            var dataTable = this.DbConnection.ExecuteQueryTable(query);
-            if (dataTable.Rows.Count == 0 || dataTable.Rows[0][0] == DBNull.Value)
-            {
-                newId = prefix + "001";
-
-            }
-            else
-            {
-
-                var oldId = dataTable.Rows[0][0].ToString();
-                var split = oldId.Split('-');
-                var temp = Convert.ToInt32(split[1]);
-                newId = prefix + (++temp).ToString("d3");
-            }
-            return newId;
+            txtCustomerName.Clear();
+            txtMobile.Clear();
+            ValidationLabel.Reset(lblFullNameError, lblMobileError);
         }
 
         private void btnClear_Click_1(object sender, EventArgs e)
         {
-            ClearErrorMessages();
-            txtCustomerName.Clear();
-            txtMobile.Clear();
+            ClearForm();
+        }
+
+        private void btnBack_Click(object sender, EventArgs e)
+        {
+            GoTo(addSales);
         }
     }
 }

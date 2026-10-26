@@ -809,7 +809,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormEmployee";
             this.Text = "FormEmployee";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormEmployee_FormClosing);
             this.Load += new System.EventHandler(this.FormEmployee_Load);
             this.panel1.ResumeLayout(false);
             this.panel3.ResumeLayout(false);

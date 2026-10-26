@@ -1,452 +1,234 @@
-﻿using BanglaProject.DataBase;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
-using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
 
 namespace BanglaProject.WindowsForm
 {
-    public partial class FromSalesReport : Form
+    // Sales report: all invoices with totals and a chart.
+    // Invoices can be filtered by date and by customer mobile number.
+    // Click an invoice to see its items, double-click it to open the printable invoice.
+    public partial class FromSalesReport : BaseForm
     {
+        private readonly Form dashboard;   // admin or employee dashboard to go back to
+        private DateTime? fromDate;        // null = no date filter
+        private DateTime? toDate;
+
         public FromSalesReport()
         {
             InitializeComponent();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-            this.dgvInvoices.SelectionChanged += dgvInvoices_SelectionChanged;
-            this.dgvInvoices.CellClick += dgvInvoices_CellClick;
-
+            dgvInvoices.SelectionChanged += dgvInvoices_SelectionChanged;
+            dgvInvoices.CellClick += dgvInvoices_CellClick;
+            dgvInvoices.CellDoubleClick += dgvInvoices_CellDoubleClick;
         }
 
-        private FormAdminView AdminView { get; set; }
-        private FormManageProducts ManageProducts { get; set; }
-        private FormEmployee Employee { get; set; }
-        private DataBaseConnection DbConnection { get; set; }
-
-        public FromSalesReport(DataBaseConnection DbConnection, FormAdminView adminView) : this()
+        public FromSalesReport(Form dashboard) : this()
         {
-            this.DbConnection = DbConnection;
-            this.AdminView = adminView;
-            this.PopulateGridView();
-            this.CalculateTotal();
-            dgvInvoiceDetails.ClearSelection();
-            dgvInvoices.ClearSelection();
-        }
-        
-
-        public FromSalesReport(DataBaseConnection DbConnection, FormEmployee employee) : this()
-        {
-            this.DbConnection = DbConnection;
-            this.Employee = employee;
-            this.PopulateGridView();
-            this.CalculateTotal();
-            dgvInvoiceDetails.ClearSelection();
-            dgvInvoices.ClearSelection();
-        }
-       
-
-        private void btnClose_Click(object sender, EventArgs e)
-        {
-            if (this.AdminView != null)
-            {
-                this.Visible = false;
-                this.AdminView.Visible = true;
-            }
-            else if (this.Employee != null)
-            {
-                this.Visible = false;
-                this.Employee.Visible = true;
-            }
-            else if (this.ManageProducts != null)
-            {
-                this.Visible = false;
-                this.ManageProducts.Visible = true;
-            }
-
-
+            this.dashboard = dashboard;
         }
 
-        private void PopulateGridView(string sql = "select * from InvoiceDetails;")
+        private void FromSalesReport_Load(object sender, EventArgs e)
         {
-            try
-            {
-                var dataset = this.DbConnection.ExecuteQuery(sql);
-
-                this.dgvInvoices.AutoGenerateColumns = false;
-
-
-                this.dgvInvoices.DataSource = dataset.Tables[0];
-
-                dgvInvoices.ClearSelection();
-                this.dgvInvoices.CurrentCell = null;
-
-
-            }
-            catch (Exception exc)
-            {
-                MessageBox.Show("An error has occurred in the database system, please try again.\n" + exc.Message);
-            }
-
-
+            HideLabel(lblSearch);
+            RefreshReport();
         }
-        private void LoadSalesChart(string fromDate = null, string toDate = null)
+
+        // Builds the WHERE part from the date filter and the mobile search box
+        private string Filter(List<SqlParameter> parameters)
         {
+            string where = " WHERE 1 = 1";
+
+            if (fromDate != null && toDate != null)
+            {
+                where += " AND INVOICE_DATE BETWEEN @From AND @To";
+                parameters.Add(Db.P("@From", fromDate.Value));
+                parameters.Add(Db.P("@To", toDate.Value));
+            }
+
+            string mobile = txtSearchCustomer.Text.Trim();
+            if (mobile != "")
+            {
+                where += " AND CUSTOMER_MOBILE LIKE @Mobile";
+                parameters.Add(Db.P("@Mobile", "%" + mobile + "%"));
+            }
+            return where;
+        }
+
+        // Reloads the invoice list, the three totals and the chart with the current filter
+        private void RefreshReport()
+        {
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            DataTable invoices = LoadGrid(dgvInvoices,
+                "SELECT * FROM InvoiceDetails" + Filter(parameters) + " ORDER BY INVOICE_DATE, INVOICE_ID",
+                parameters.ToArray());
+
+            dgvInvoiceDetails.DataSource = null;
+            if (invoices == null) return;
+
+            ShowTotals(invoices);
+            LoadSalesChart(invoices);
+        }
+
+        private void ShowTotals(DataTable invoices)
+        {
+            decimal totalSales = 0;
+            foreach (DataRow row in invoices.Rows)
+                totalSales += Convert.ToDecimal(row["FINAL_AMOUNT"]);
+
+            int count = invoices.Rows.Count;
+            decimal average = count == 0 ? 0 : totalSales / count;
+
+            lblTIAmount.Text = count.ToString();
+            lblTSAmount.Text = "Tk " + totalSales.ToString("N2");
+            lblASAmount.Text = "Tk " + average.ToString("N2");
+        }
+
+        // Column chart: total sales of each day
+        private void LoadSalesChart(DataTable invoices)
+        {
+            SortedDictionary<DateTime, decimal> salesPerDay = new SortedDictionary<DateTime, decimal>();
+            foreach (DataRow row in invoices.Rows)
+            {
+                DateTime day = Convert.ToDateTime(row["INVOICE_DATE"]).Date;
+                if (!salesPerDay.ContainsKey(day)) salesPerDay[day] = 0;
+                salesPerDay[day] += Convert.ToDecimal(row["FINAL_AMOUNT"]);
+            }
+
             chartSales.Series.Clear();
             chartSales.ChartAreas.Clear();
             chartSales.Titles.Clear();
 
-            chartSales.ChartAreas.Add("Main");
+            ChartArea area = chartSales.ChartAreas.Add("Main");
+            Font smallBold = new Font("Segoe UI", 8, FontStyle.Bold);
+            area.AxisX.LabelStyle.Font = smallBold;
+            area.AxisY.LabelStyle.Font = smallBold;
+            area.AxisX.LabelAutoFitStyle = LabelAutoFitStyles.None;
+            area.AxisY.LabelAutoFitStyle = LabelAutoFitStyles.None;
 
-            Series s = new Series("Sales");
-            s.ChartType = SeriesChartType.Column;
-            s.IsValueShownAsLabel = true;
-            chartSales.Series.Add(s);
+            Series sales = chartSales.Series.Add("Sales");
+            sales.ChartType = SeriesChartType.Column;
+            sales.IsValueShownAsLabel = true;
+            sales.Font = smallBold;
 
-            string sql;
+            foreach (KeyValuePair<DateTime, decimal> day in salesPerDay)
+                sales.Points.AddXY(day.Key.ToString("dd-MMM"), (double)day.Value);
 
-            if (string.IsNullOrEmpty(fromDate) || string.IsNullOrEmpty(toDate))
+            foreach (Legend legend in chartSales.Legends)
             {
-                sql =
-                    "SELECT INVOICE_DATE, SUM(CAST(FINAL_AMOUNT AS float)) AS TotalSales " +
-                    "FROM InvoiceDetails " +
-                    "GROUP BY INVOICE_DATE " +
-                    "ORDER BY INVOICE_DATE;";
-            }
-            else
-            {
-                sql =
-                    "SELECT INVOICE_DATE, SUM(CAST(FINAL_AMOUNT AS float)) AS TotalSales " +
-                    "FROM InvoiceDetails " +
-                    "WHERE INVOICE_DATE >= '" + fromDate + "' " +
-                    "AND INVOICE_DATE <= '" + toDate + "' " +
-                    "GROUP BY INVOICE_DATE " +
-                    "ORDER BY INVOICE_DATE;";
+                legend.Font = smallBold;
+                legend.IsTextAutoFit = false;
             }
 
-            DataTable dt = DbConnection.ExecuteQueryTable(sql);
-
-            foreach (DataRow row in dt.Rows)
-            {
-                s.Points.AddXY(
-                    Convert.ToDateTime(row["INVOICE_DATE"]).ToString("dd-MMM"),
-                    Convert.ToDouble(row["TotalSales"])
-                );
-            }
-
-            chartSales.Titles.Add("Sales Overview");
-        }
-
-
-        private void ApplyChartFonts()
-        {
-            Font titleFont = new Font("Segoe UI", 13, FontStyle.Bold);
-            Font axisFont = new Font("Segoe UI", 8, FontStyle.Bold);
-            Font valueFont = new Font("Segoe UI", 8, FontStyle.Bold);
-            Font legendFont = new Font("Segoe UI", 8, FontStyle.Bold);
-
-            foreach (ChartArea area in chartSales.ChartAreas)
-            {
-                area.AxisX.LabelAutoFitStyle = LabelAutoFitStyles.None;
-                area.AxisY.LabelAutoFitStyle = LabelAutoFitStyles.None;
-
-                area.AxisX.LabelStyle.Font = axisFont;
-                area.AxisY.LabelStyle.Font = axisFont;
-                area.AxisX.TitleFont = axisFont;
-                area.AxisY.TitleFont = axisFont;
-            }
-
-            foreach (Series s in chartSales.Series)
-            {
-                s.Font = valueFont;
-                s.IsValueShownAsLabel = true;
-            }
-
-            foreach (Legend l in chartSales.Legends)
-            {
-                l.Font = legendFont;
-                l.IsTextAutoFit = false;
-            }
-
-            foreach (Title t in chartSales.Titles)
-            {
-                t.Font = titleFont;
-            }
-        }
-
-
-
-
-
-
-
-
-
-
-        private void btnPrintInvoice_Click(object sender, EventArgs e)
-        {
-            FormInvoicePrint formInvoicePrint = new FormInvoicePrint(this.DbConnection, this);
-            this.Visible = false;
-            formInvoicePrint.Visible = true;
-        }
-
-        private void CalculateTotal()
-        {
-            int totalInvoices = dgvInvoices.Rows.Count;
-            this.lblTIAmount.Text =  totalInvoices.ToString();
-            double totalAmount = 0;
-            foreach (DataGridViewRow row in dgvInvoices.Rows)
-            {
-                totalAmount += Convert.ToDouble(row.Cells["FINAL_AMOUNT"].Value);
-            }
-            this.lblTSAmount.Text = "Tk " + totalAmount.ToString("N2");
-
-            double AverageAmount = totalInvoices == 0 ? 0 : totalAmount / totalInvoices;
-            this.lblASAmount.Text = "Tk " + AverageAmount.ToString("N2");
-
-
-        }
-
-      
-
-        private void FromSalesReport_Load(object sender, EventArgs e)
-        {
-            dgvInvoices.AutoGenerateColumns = false;
-
-            PopulateGridView();
-            CalculateTotal();
-
-            LoadSalesChart();
-            ApplyChartFonts();
-
-       
-            dgvInvoices.ClearSelection();
-            dgvInvoiceDetails.ClearSelection();
-            dgvInvoices.CurrentCell = null;
-
-            lblSearch.Text = "";
-            lblSearch.Visible = false;
-
-        }
-
-        private void FromSalesReport_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-        "Are you sure you want to close the application?",
-        "Confirm Exit",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question
-    );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
+            chartSales.Titles.Add("Sales Overview").Font = new Font("Segoe UI", 13, FontStyle.Bold);
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            string fromDate = dtpFromDate.Value.ToString("MM/dd/yyyy");
-            string toDate = dtpToDate.Value.ToString("MM/dd/yyyy");
-
-            if (dtpFromDate.Value > dtpToDate.Value)
+            if (dtpFromDate.Value.Date > dtpToDate.Value.Date)
             {
-                MessageBox.Show("From Date >! To Date");
+                Msg.Warning("From Date cannot be after To Date.", "Invalid Date");
                 return;
             }
 
-            string sql =
-                "SELECT * FROM InvoiceDetails " +
-                "WHERE INVOICE_DATE >= '" + fromDate + "' " +
-                "AND INVOICE_DATE <= '" + toDate + "' " +
-                "ORDER BY INVOICE_DATE;";
-
-
-            PopulateGridView(sql);
-
-
-            CalculateTotal();
-
-
-            LoadSalesChart(fromDate, toDate);
-            ApplyChartFonts();
-        }
-        private void dgvInvoices_CellClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0) return;
-            dgvInvoices.Rows[e.RowIndex].Selected = true;
-            ShowSelectedInvoiceOnLabel();
-        }
-
-        private void dgvInvoices_SelectionChanged(object sender, EventArgs e)
-        {
-            ShowSelectedInvoiceOnLabel();
-        }
-
-        private void ShowSelectedInvoiceOnLabel()
-        {
-            if (dgvInvoices.SelectedRows.Count == 1)
-            {
-                string invoiceId = dgvInvoices.SelectedRows[0].Cells["INVOICE_ID"].Value?.ToString() ?? "";
-                string customerName = dgvInvoices.SelectedRows[0].Cells["CUSTOMER_NAME"].Value?.ToString() ?? "";
-
-                lblSearch.Text = "Selected: " + invoiceId + " - " + customerName;
-                lblSearch.ForeColor = Color.Green;
-                lblSearch.Visible = true;
-
-                string sql = $@"select PRODUCT_ID, PRODUCT_NAME, QUANTITY, UNIT_PRICE,
-                        SUB_TOTAL from InvoiceItems
-                        where INVOICE_ID = '{invoiceId}'";
-                try
-                {
-                    var dataset = this.DbConnection.ExecuteQuery(sql);
-
-                    this.dgvInvoiceDetails.AutoGenerateColumns = false;
-                    this.dgvInvoiceDetails.DataSource = dataset.Tables[0];
-
-                    dgvInvoiceDetails.ClearSelection();
-
-                }
-                catch (Exception exc)
-                {
-                    MessageBox.Show("An error has occurred in the database system, please try again.\n" + exc.Message);
-                }
-            }
-            else
-            {
-                lblSearch.Text = "";
-                lblSearch.Visible = false;
-            }
-        }
-
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
-            PopulateGridView();    
-            CalculateTotal();        
-            LoadSalesChart();   
-            ApplyChartFonts();
-
-            dgvInvoices.ClearSelection();
-            dgvInvoices.CurrentCell = null;
-
-            lblSearch.Text = "";
-            lblSearch.Visible = false;
-            txtSearchCustomer.Text = "";
+            fromDate = dtpFromDate.Value.Date;
+            toDate = dtpToDate.Value.Date;
+            RefreshReport();
         }
 
         private void txtSearchCustomer_TextChanged(object sender, EventArgs e)
         {
-            string mobile = txtSearchCustomer.Text.Trim();
+            RefreshReport();
 
-            if (string.IsNullOrEmpty(mobile))
+            if (txtSearchCustomer.Text.Trim() == "")
+                HideLabel(lblSearch);
+            else
+                ShowFound(lblSearch, dgvInvoices.Rows.Count > 0);
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            fromDate = null;
+            toDate = null;
+            txtSearchCustomer.Text = "";   // this also reloads the report
+            RefreshReport();
+            HideLabel(lblSearch);
+        }
+
+        // ---------- selected invoice ----------
+
+        private string SelectedInvoiceId()
+        {
+            if (dgvInvoices.SelectedRows.Count != 1) return null;
+            return dgvInvoices.SelectedRows[0].Cells["INVOICE_ID"].Value?.ToString();
+        }
+
+        private void dgvInvoices_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+                dgvInvoices.Rows[e.RowIndex].Selected = true;
+        }
+
+        // Shows the items of the selected invoice in the lower grid
+        private void dgvInvoices_SelectionChanged(object sender, EventArgs e)
+        {
+            string invoiceId = SelectedInvoiceId();
+            if (invoiceId == null)
             {
-                PopulateGridView();
-                dgvInvoices.ClearSelection();
-                dgvInvoices.CurrentCell = null;
-
-                lblSearch.Text = "";
-                lblSearch.Visible = false;
+                HideLabel(lblSearch);
                 return;
             }
 
-            string safe = mobile.Replace("'", "''");
-
-            string sql =
-                "SELECT * FROM InvoiceDetails " +
-                "WHERE CUSTOMER_MOBILE LIKE '%" + safe + "%' " +
-                "ORDER BY INVOICE_DATE;";
-
-            PopulateGridView(sql);
-
-            dgvInvoices.ClearSelection();
-            dgvInvoices.CurrentCell = null;
-
-            int count = dgvInvoices.Rows.Count;
-            if (dgvInvoices.AllowUserToAddRows) count--;
-
-            if (count > 0)
-            {
-                lblSearch.Text = "Found";
-                lblSearch.ForeColor = Color.Green;
-                lblSearch.Visible = true;
-            }
-            else
-            {
-                lblSearch.Text = "Not Found";
-                lblSearch.ForeColor = Color.Red;
-                lblSearch.Visible = true;
-            }
-
+            ShowSelected(lblSearch, invoiceId, dgvInvoices.SelectedRows[0].Cells["CUSTOMER_NAME"].Value?.ToString());
+            LoadGrid(dgvInvoiceDetails,
+                "SELECT PRODUCT_ID, PRODUCT_NAME, QUANTITY, UNIT_PRICE, SUB_TOTAL FROM InvoiceItems WHERE INVOICE_ID = @ID",
+                Db.P("@ID", invoiceId));
         }
 
-        private void btnBack_Click(object sender, EventArgs e)
+        private void dgvInvoices_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (this.AdminView != null)
-            {
-                this.Visible = false;
-                this.AdminView.Visible = true;
-            }
-            else if (this.Employee != null)
-            {
-                this.Visible = false;
-                this.Employee.Visible = true;
-            }
-            else if (this.ManageProducts != null)
-            {
-                this.Visible = false;
-                this.ManageProducts.Visible = true;
-            }
-
+            string invoiceId = SelectedInvoiceId();
+            if (e.RowIndex >= 0 && invoiceId != null)
+                GoTo(new FormInvoicePrint(invoiceId, this));
         }
 
         private void btnDeleteInvoice_Click(object sender, EventArgs e)
         {
-            if (dgvInvoices.SelectedRows.Count == 1)
+            string invoiceId = SelectedInvoiceId();
+            if (invoiceId == null)
             {
-                string invoiceId = dgvInvoices.SelectedRows[0].Cells["INVOICE_ID"].Value?.ToString() ?? "";
-                DialogResult result = MessageBox.Show(
-                    "Are you sure you want to delete Invoice ID: " + invoiceId + "?",
-                    "Confirm Delete",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning
-                );
-                if (result == DialogResult.Yes)
-                {
-                    try
-                    {
-                        string deleteItemsSql = $"DELETE FROM InvoiceItems WHERE INVOICE_ID = '{invoiceId}';";
-                        string deleteDetailsSql = $"DELETE FROM InvoiceDetails WHERE INVOICE_ID = '{invoiceId}';";
-                        this.DbConnection.ExecuteDMLQuery(deleteItemsSql);
-                        this.DbConnection.ExecuteDMLQuery(deleteDetailsSql);
-                        MessageBox.Show("Invoice deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        PopulateGridView();
-                        CalculateTotal();
-                        LoadSalesChart();
-                        ApplyChartFonts();
-                        dgvInvoices.ClearSelection();
-                        dgvInvoices.CurrentCell = null;
-                        lblSearch.Text = "";
-                        lblSearch.Visible = false;
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("An error has occurred while deleting the invoice. Please try again.\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                    
-                }
-                else {
-                    MessageBox.Show("Please Select 1 row to Delete" , "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                Msg.Info("Please select 1 row to delete.");
+                return;
             }
 
+            if (!Msg.Confirm("Are you sure you want to delete Invoice ID: " + invoiceId + "?", "Confirm Delete")) return;
+
+            try
+            {
+                // items first, then the invoice itself - both or nothing
+                Db.ExecuteInTransaction(new List<SqlCommand>
+                {
+                    Db.Command("DELETE FROM InvoiceItems WHERE INVOICE_ID = @ID", Db.P("@ID", invoiceId)),
+                    Db.Command("DELETE FROM InvoiceDetails WHERE INVOICE_ID = @ID", Db.P("@ID", invoiceId))
+                });
+
+                Msg.Info("Invoice deleted successfully.", "Success");
+                RefreshReport();
+                HideLabel(lblSearch);
+            }
+            catch (Exception ex)
+            {
+                Msg.DatabaseError(ex);
+            }
+        }
+
+        private void btnBack_Click(object sender, EventArgs e)
+        {
+            GoTo(dashboard);
         }
     }
 }

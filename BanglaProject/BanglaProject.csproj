@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -38,6 +38,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Windows.Forms.DataVisualization" />
     <Reference Include="System.Xml.Linq" />
@@ -51,14 +52,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DataBase\DataBaseConnection.cs" />
-    <Compile Include="FarmDatabaseDataSet.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>FarmDatabaseDataSet.xsd</DependentUpon>
+    <Compile Include="Data\Db.cs" />
+    <Compile Include="Helpers\BaseForm.cs">
+      <SubType>Form</SubType>
     </Compile>
-    <Compile Include="InputValidatorProduct.cs" />
-    <Compile Include="InputValidatorUser.cs" />
+    <Compile Include="Helpers\Msg.cs" />
+    <Compile Include="Validation\ProductValidator.cs" />
+    <Compile Include="Validation\UserValidator.cs" />
+    <Compile Include="Validation\ValidationLabel.cs" />
     <Compile Include="WindowsForm\FormAddCustomer.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -197,17 +198,6 @@
     <EmbeddedResource Include="WindowsForm\FromSalesReport.resx">
       <DependentUpon>FromSalesReport.cs</DependentUpon>
     </EmbeddedResource>
-    <None Include="FarmDatabaseDataSet.xsc">
-      <DependentUpon>FarmDatabaseDataSet.xsd</DependentUpon>
-    </None>
-    <None Include="FarmDatabaseDataSet.xsd">
-      <Generator>MSDataSetGenerator</Generator>
-      <LastGenOutput>FarmDatabaseDataSet.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="FarmDatabaseDataSet.xss">
-      <DependentUpon>FarmDatabaseDataSet.xsd</DependentUpon>
-    </None>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -223,9 +213,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Icons\icon_add.png" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Assets\Icons\icon_back.png" />
+    <Content Include="Assets\Branding\farm_logo.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

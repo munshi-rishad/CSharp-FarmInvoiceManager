@@ -519,7 +519,6 @@
             this.txtFinalAmount.ScrollBars = System.Windows.Forms.ScrollBars.Horizontal;
             this.txtFinalAmount.Size = new System.Drawing.Size(107, 26);
             this.txtFinalAmount.TabIndex = 25;
-            this.txtFinalAmount.TextChanged += new System.EventHandler(this.txtFinalAmount_TextChanged);
             // 
             // txtDiscount
             // 
@@ -996,7 +995,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormAddSales";
             this.Text = "FormAddSales";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormAddSales_FormClosing);
             this.Load += new System.EventHandler(this.FormAddSales_Load);
             this.panelTitleNameAdmin.ResumeLayout(false);
             this.panelTitleNameAdmin.PerformLayout();

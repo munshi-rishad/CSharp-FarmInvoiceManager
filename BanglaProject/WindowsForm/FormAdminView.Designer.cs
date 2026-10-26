@@ -130,8 +130,6 @@
             this.label1 = new System.Windows.Forms.Label();
             this.labelTitleControlDashboard = new System.Windows.Forms.Label();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
-            this.farmDatabaseDataSetBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.farmDatabaseDataSet = new BanglaProject.FarmDatabaseDataSet();
             this.panel1.SuspendLayout();
             this.panel14.SuspendLayout();
             this.pnlButtonHide.SuspendLayout();
@@ -158,8 +156,6 @@
             this.panel2.SuspendLayout();
             this.panelTitleNameAdmin.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.farmDatabaseDataSetBindingSource)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.farmDatabaseDataSet)).BeginInit();
             this.SuspendLayout();
             // 
             // panel1
@@ -550,7 +546,6 @@
             this.dgvCustomer.Size = new System.Drawing.Size(734, 358);
             this.dgvCustomer.TabIndex = 45;
             this.dgvCustomer.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvCustomer_CellClick);
-            this.dgvCustomer.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvCustomer_CellContentClick);
             // 
             // CUSTOMER_ID
             // 
@@ -1000,7 +995,6 @@
             this.pnlGrid.Name = "pnlGrid";
             this.pnlGrid.Size = new System.Drawing.Size(750, 486);
             this.pnlGrid.TabIndex = 45;
-            this.pnlGrid.DoubleClick += new System.EventHandler(this.pnlGrid_DoubleClick);
             // 
             // dgvUserInfo
             // 
@@ -1052,7 +1046,6 @@
             this.dgvUserInfo.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dgvUserInfo.Size = new System.Drawing.Size(750, 421);
             this.dgvUserInfo.TabIndex = 44;
-            this.dgvUserInfo.DoubleClick += new System.EventHandler(this.dgvUserInfo_DoubleClick);
             // 
             // USER_ID
             // 
@@ -1159,7 +1152,6 @@
             this.lblsearch.Size = new System.Drawing.Size(49, 15);
             this.lblsearch.TabIndex = 46;
             this.lblsearch.Text = "Search ";
-            this.lblsearch.Click += new System.EventHandler(this.label3_Click);
             // 
             // panel15
             // 
@@ -1420,16 +1412,6 @@
             this.pictureBox1.TabIndex = 1;
             this.pictureBox1.TabStop = false;
             // 
-            // farmDatabaseDataSetBindingSource
-            // 
-            this.farmDatabaseDataSetBindingSource.DataSource = this.farmDatabaseDataSet;
-            this.farmDatabaseDataSetBindingSource.Position = 0;
-            // 
-            // farmDatabaseDataSet
-            // 
-            this.farmDatabaseDataSet.DataSetName = "FarmDatabaseDataSet";
-            this.farmDatabaseDataSet.SchemaSerializationMode = System.Data.SchemaSerializationMode.IncludeSchema;
-            // 
             // FormAdminView
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -1442,7 +1424,6 @@
             this.Name = "FormAdminView";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "AdminView";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormAdminView_FormClosing);
             this.Load += new System.EventHandler(this.FormAdminView_Load);
             this.panel1.ResumeLayout(false);
             this.panel14.ResumeLayout(false);
@@ -1477,8 +1458,6 @@
             this.panelTitleNameAdmin.ResumeLayout(false);
             this.panelTitleNameAdmin.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.farmDatabaseDataSetBindingSource)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.farmDatabaseDataSet)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -1516,8 +1495,6 @@
         private System.Windows.Forms.DataGridView dgvUserInfo;
         private System.Windows.Forms.Panel pnlTable;
         private System.Windows.Forms.Panel pnlGrid;
-        private System.Windows.Forms.BindingSource farmDatabaseDataSetBindingSource;
-        private FarmDatabaseDataSet farmDatabaseDataSet;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Label lblsearch;
         private System.Windows.Forms.Panel panel15;

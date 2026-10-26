@@ -1,190 +1,93 @@
-﻿using BanglaProject.DataBase;
-using BanglaProject.WindowsForm;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using System;
 using System.Data;
-using System.Data.Common;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
+using BanglaProject.WindowsForm;
 
 namespace BanglaProject
 {
-    public partial class FormLogin : Form
+    // First window of the application. Admins go to the admin dashboard,
+    // employees go to the employee dashboard.
+    public partial class FormLogin : BaseForm
     {
-
-        private DataBaseConnection DbConnection { get; set; }
-
         public FormLogin()
         {
             InitializeComponent();
-            this.DbConnection = new DataBaseConnection();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
         }
 
         private void btnLogin_Click(object sender, EventArgs e)
         {
-            string password = this.txtPassword.Text;
-            string username = this.txtUsername.Text;
+            string username = txtUsername.Text.Trim();
+            string password = txtPassword.Text;
 
-            if (this.txtUsername.Text == "" || this.txtPassword.Text == "")
+            if (username == "" || password == "")
             {
-                MessageBox.Show(
-                 "Please enter your username (or User ID) and password to continue.",
-                 "Missing Information",
-                 MessageBoxButtons.OK,
-                 MessageBoxIcon.Warning
- );
+                Msg.Warning("Please enter your username (or User ID) and password to continue.", "Missing Information");
                 return;
             }
 
-
             try
             {
-                string query = $"SELECT USER_ID, FULL_NAME, ROLE, STATUS FROM UserInfo  WHERE (USERNAME = '{ username }' or USER_ID = '{ username }') AND PASSWORD = '{ password }'";
+                // the user can log in with the username or with the User ID
+                DataTable user = Db.GetTable(
+                    "SELECT USER_ID, FULL_NAME, ROLE, STATUS FROM UserInfo " +
+                    "WHERE (USERNAME = @User OR USER_ID = @User) AND PASSWORD = @Password",
+                    Db.P("@User", username), Db.P("@Password", password));
 
-                var dataTable = this.DbConnection.ExecuteQueryTable(query);
-
-                if (dataTable.Rows.Count == 0)
+                if (user.Rows.Count == 0)
                 {
-                    MessageBox.Show(
-                     "Login failed. The username/User ID or password you entered is incorrect.",
-                     "Login Failed",
-                     MessageBoxButtons.OK,
-                     MessageBoxIcon.Error
-                 );
-
+                    Msg.Error("Login failed. The username/User ID or password you entered is incorrect.", "Login Failed");
                     return;
                 }
 
-                bool status = (bool)dataTable.Rows[0]["STATUS"];
-                string role = dataTable.Rows[0]["ROLE"].ToString().ToLower();
-                string fullName = dataTable.Rows[0]["FULL_NAME"].ToString();
-                string userId = dataTable.Rows[0]["USER_ID"].ToString();
+                DataRow row = user.Rows[0];
+                string userId = row["USER_ID"].ToString();
+                string fullName = row["FULL_NAME"].ToString();
+                string role = row["ROLE"].ToString().ToLower();
 
-                //account inactive
-                if (!status)
+                if (!(bool)row["STATUS"])
                 {
-                    MessageBox.Show(
-                    "Your account is currently inactive. Please contact the administrator for activation.",
-                    "Account Inactive",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-);
-
+                    Msg.Info("Your account is currently inactive. Please contact the administrator for activation.", "Account Inactive");
                     return;
                 }
 
-                // Account active
+                Form dashboard;
                 if (role == "admin")
-                {
-                    MessageBox.Show(
-                    "Welcome! You have logged in as Admin successfully.",
-                    "Login Successful",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-);
-
-                    FormAdminView adminView = new FormAdminView(DbConnection, fullName, userId, this);
-
-                    this.Visible = false;
-                    adminView.Visible = true;
-                    txtUsername.Clear();
-                    txtPassword.Clear();
-
-                }
-
+                    dashboard = new FormAdminView(fullName, userId, this);
                 else if (role == "employee")
-                {
-                    MessageBox.Show(
-                    "Welcome! You have logged in as Employee successfully.",
-                    "Login Successful",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-
-
-                    FormEmployee employee = new FormEmployee(DbConnection, fullName, userId, this);
-                    
-
-                    this.Visible = false;
-                    employee.Visible = true;
-                    txtUsername.Clear();
-                    txtPassword.Clear();
-
-                }
+                    dashboard = new FormEmployee(fullName, userId, this);
                 else
                 {
-                    MessageBox.Show(
-                     "Access denied. Your account role is not recognized. Please contact the administrator.",
-                     "Access Denied",
-                     MessageBoxButtons.OK,
-                     MessageBoxIcon.Error
-                 );
-
+                    Msg.Error("Access denied. Your account role is not recognized. Please contact the administrator.", "Access Denied");
                     return;
                 }
 
+                Msg.Info("Welcome! You have logged in as " + (role == "admin" ? "Admin" : "Employee") + " successfully.", "Login Successful");
+                txtUsername.Clear();
+                txtPassword.Clear();
+                GoTo(dashboard);
             }
-
             catch (Exception ex)
             {
-                MessageBox.Show(
-                "Something went wrong while trying to log you in.\n\nPlease try again.\n\nDetails: " + ex.Message,
-                "Login Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
-);
-
-
+                Msg.Error("Something went wrong while trying to log you in.\n\nPlease try again.\n\nDetails: " + ex.Message, "Login Error");
             }
         }
 
         private void btnClear_Click(object sender, EventArgs e)
         {
-            this.txtPassword.Clear();
-            this.txtUsername.Clear();
+            txtUsername.Clear();
+            txtPassword.Clear();
         }
 
         private void chkPassShow_CheckedChanged(object sender, EventArgs e)
         {
-            if (this.chkPassShow.Checked)
-            {
-                this.txtPassword.UseSystemPasswordChar = false;
-            }
-            else
-            {
-                this.txtPassword.UseSystemPasswordChar = true;
-            }
+            txtPassword.UseSystemPasswordChar = !chkPassShow.Checked;
         }
 
         private void lblForget_Click(object sender, EventArgs e)
         {
-            FormFindPassword frm = new FormFindPassword(this.DbConnection, this);
-            this.Visible = false;
-            frm.Visible = true;
-        }
-
-        private void FormLogin_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-                 "Are you sure you want to close the application?",
-                 "Confirm Exit",
-                 MessageBoxButtons.YesNo,
-                 MessageBoxIcon.Question
-             );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
+            GoTo(new FormFindPassword(this));
         }
     }
 }

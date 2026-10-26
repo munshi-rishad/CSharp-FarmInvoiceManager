@@ -1,35 +1,29 @@
-﻿using BanglaProject.DataBase;
-using System;
+﻿using System;
 using System.Data;
-using System.Drawing;
-using System.Windows.Forms;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
 
 namespace BanglaProject.WindowsForm
 {
-    public partial class FormFindPassword : Form
+    // Shows a forgotten password when User ID, username and mobile number all match
+    public partial class FormFindPassword : BaseForm
     {
-        private FormLogin LoginForm;
-        private DataBaseConnection DbConnection { set; get; }
+        private readonly FormLogin loginForm;
 
         public FormFindPassword()
         {
             InitializeComponent();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
             lblSearch.Text = "";
         }
 
-        public FormFindPassword(DataBaseConnection dbConnection,FormLogin loginData) : this()
+        public FormFindPassword(FormLogin loginForm) : this()
         {
-            this.LoginForm = loginData;
-            this.DbConnection = dbConnection;
+            this.loginForm = loginForm;
         }
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            LoginForm.Visible = true;
-            this.Visible = false;
+            GoTo(loginForm);
         }
 
         private void btnSearch_Click_1(object sender, EventArgs e)
@@ -40,57 +34,24 @@ namespace BanglaProject.WindowsForm
 
             if (userId == "" || username == "" || mobile == "")
             {
-                MessageBox.Show("Please fill all fields");
+                Msg.Warning("Please fill all fields.", "Missing Information");
                 return;
             }
+
             try
             {
-                string sql =
-                    $@"SELECT PASSWORD FROM UserInfo  
-                WHERE USER_ID='{userId} ' 
-                AND USERNAME='{username}' 
-                AND MOBILE='{mobile}'";
+                DataTable result = Db.GetTable(
+                    "SELECT PASSWORD FROM UserInfo WHERE USER_ID = @ID AND USERNAME = @Username AND MOBILE = @Mobile",
+                    Db.P("@ID", userId), Db.P("@Username", username), Db.P("@Mobile", mobile));
 
-                DataTable dt = DbConnection.ExecuteQueryTable(sql);
-
-                if (dt != null && dt.Rows.Count == 1)
-                {
-                    txtPassword.Text = dt.Rows[0]["PASSWORD"].ToString();
-                    lblSearch.Text = "Found";
-                    lblSearch.ForeColor = Color.Green;
-                }
-                else
-                {
-                    txtPassword.Clear();
-                    lblSearch.Text = "Not Found";
-                    lblSearch.ForeColor = Color.Red;
-                }
-
+                bool found = result.Rows.Count == 1;
+                txtPassword.Text = found ? result.Rows[0]["PASSWORD"].ToString() : "";
+                ShowFound(lblSearch, found);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("An error has occurred while searching for the password. Please try again.\n" + ex.Message);
+                Msg.DatabaseError(ex);
             }
-        }
-
-        private void FormFindPassword_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-        "Are you sure you want to close the application?",
-        "Confirm Exit",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question
-    );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
-        }
-
-        private void FormFindPassword_Load(object sender, EventArgs e)
-        {
-
         }
     }
 }

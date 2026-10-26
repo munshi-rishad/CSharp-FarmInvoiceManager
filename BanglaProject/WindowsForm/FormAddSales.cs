@@ -1,732 +1,304 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
+using System.Data.SqlClient;
 using System.Drawing;
-using BanglaProject.DataBase;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
+using BanglaProject.Validation;
 using BanglaProject.WindowsForm;
 
 namespace BanglaProject
 {
-    public partial class FormAddSales : Form
+    // Make a new sale: choose the customer, add products to the cart,
+    // give a discount and save the invoice. Saving also reduces the product stock.
+    public partial class FormAddSales : BaseForm
     {
+        private readonly Form dashboard;   // admin or employee dashboard to go back to
+        private readonly string userId;
+        private bool isFormLoaded = false;
+        private bool isPremiumCustomer = false;
+
         public FormAddSales()
         {
             InitializeComponent();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
             lblMobileError.Text = "";
             lblFullNameError.Text = "";
-
         }
 
-        private FormAdminView AdminView { get; set; }
-        private FormEmployee Employee { get; set; }
-        private string CurrentUserID { get; set; }
-        private DataBaseConnection DbConnection { get; set; }
-
-        public FormAddSales(DataBaseConnection DbConnection,string userID, FormAdminView admin) : this()
+        public FormAddSales(string userId, Form dashboard) : this()
         {
-            this.AdminView = admin;
-            this.CurrentUserID = userID;
-            this.DbConnection = DbConnection;
+            this.userId = userId;
+            this.dashboard = dashboard;
         }
-
-        public FormAddSales(DataBaseConnection DbConnection,string userId, FormEmployee employee) : this()
-        {
-            this.Employee = employee;
-            this.CurrentUserID = userId;
-            this.DbConnection = DbConnection;
-        }
-
-        private void btnAddCustomer_Click(object sender, EventArgs e)
-        {
-            FormAddCustomer addCustomer = new FormAddCustomer(this.DbConnection, this);
-            this.Visible = false;
-            addCustomer.Visible = true;
-        }
-
-        private void cmbProduct_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (cmbProduct.SelectedIndex < 0 || cmbProduct.SelectedValue == null)
-                return;
-
-            string sql = $"select UNITPRICE, QUANTITY from ProductInfo where PRODUCT_ID = '{cmbProduct.SelectedValue}';";
-            var dataTable = this.DbConnection.ExecuteQueryTable(sql);
-
-            if (dataTable.Rows.Count > 0)
-            {
-                txtUnitPrice.Text = dataTable.Rows[0]["UNITPRICE"].ToString();
-                txtAvailableStocks.Text = dataTable.Rows[0]["QUANTITY"].ToString();
-            }
-        }
-
-        //kaj korte hbe
-        //private void PopulateGridView(string sql = "select * from ProductInfo;")
-        //{
-        //    try
-        //    {
-        //        var dataset = this.DbConnection.ExecuteQuery(sql);
-
-        //        this.dgvProductInfo.AutoGenerateColumns = false;
-        //        this.dgvProductInfo.DataSource = dataset.Tables[0];
-
-        //    }
-        //    catch (Exception exc)
-        //    {
-        //        MessageBox.Show("An error has occurred in the database system, please try again.\n" + exc.Message);
-        //    }
-        //}
-
-        private void ClearAllFields()
-        {
-            txtCustomerName.Text = "";
-            lblFullNameError.Text = "";
-            lblMobileError.Text = "";
-            cmbNumber.Text = "";
-            cmbProduct.SelectedIndex = -1;
-            txtUnitPrice.Text = "";
-            txtQuantity.Text = "";
-            txtAvailableStocks.Text = "";
-            txtItemTotal.Text = "";
-            txtTotalAmount.Text = "";
-            txtDiscount.Text = "";
-            txtFinalAmount.Text = "";
-            dgvProductInfo.Rows.Clear();
-            dgvProductInfo.ClearSelection();
-            lblSearch.Text = "";
-            lblSearch.Visible = false;
-        }
-
-
-        private void btnAddItem_Click(object sender, EventArgs e)
-        {
-            if (cmbProduct.SelectedIndex < 0 || cmbProduct.SelectedValue == null)
-            {
-                MessageBox.Show(
-                 "Please select a product before adding an item.",
-                 "Product Required",
-                 MessageBoxButtons.OK,
-                 MessageBoxIcon.Warning
-             );
-
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(txtQuantity.Text))
-            {
-                MessageBox.Show(
-                 "Please enter the quantity to add.",
-                 "Quantity Required",
-                 MessageBoxButtons.OK,
-                 MessageBoxIcon.Warning
-             );
-
-                return;
-            }
-
-            try
-            {
-                string productId = cmbProduct.SelectedValue.ToString();
-                string query = $@"SELECT PRODUCT_ID, PRODUCT_NAME, UNITPRICE, QUANTITY, CREATED_DATE 
-                  FROM ProductInfo 
-                  WHERE PRODUCT_ID = '{productId}'";
-
-                var dataTable = this.DbConnection.ExecuteQueryTable(query);
-
-                if (dataTable.Rows.Count == 1)
-                {
-                    dgvProductInfo.Rows.Add(
-                        dataTable.Rows[0]["PRODUCT_ID"].ToString(),
-                        dataTable.Rows[0]["PRODUCT_NAME"].ToString(),
-                        dataTable.Rows[0]["QUANTITY"].ToString(),
-                        dataTable.Rows[0]["UNITPRICE"].ToString(),
-                        dataTable.Rows[0]["CREATED_DATE"].ToString(),
-                        this.txtQuantity.Text,
-                        this.txtItemTotal.Text
-                    );
-                    CalculateSubTotal();
-                    CalculateNetPayable();
-                    cmbProduct.SelectedIndex = -1;
-                    txtUnitPrice.Text = "";
-                    txtQuantity.Text = "";
-                    txtAvailableStocks.Text = "";
-                    txtItemTotal.Text = "";
-
-                }
-                else
-                {
-                    MessageBox.Show(
-                    "The selected product could not be found. Please refresh and try again.",
-                    "Product Not Found",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-
-                }
-            }
-            catch (Exception exc)
-            {
-                MessageBox.Show(
-                "A database error occurred while adding the item.\n\nPlease try again.\n\nDetails: " + exc.Message,
-                "Database Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
-            );
-
-            }
-            this.dgvProductInfo.ClearSelection();
-        }
-        private void CalculateSubTotal()
-        {
-            double subTotal = 0;
-
-            foreach (DataGridViewRow row in dgvProductInfo.Rows)
-            {
-                if (row.Cells[6].Value != null && row.Cells[6].Value.ToString() != "")
-                {
-                    subTotal += Convert.ToDouble(row.Cells[6].Value);
-                }
-            }
-
-            txtTotalAmount.Text = subTotal.ToString("0.00");
-        }
-
-        private void CalculateNetPayable()
-        {
-            double subTotal = txtTotalAmount.Text == "" ? 0 : Convert.ToDouble(txtTotalAmount.Text);
-            double discount = txtDiscount.Text == "" ? 0 : Convert.ToDouble(txtDiscount.Text);
-
-            double discountAmount = (subTotal * discount) / 100;
-            double netPayable = subTotal - discountAmount;
-
-            this.txtFinalAmount.Text = netPayable.ToString("0.00");
-        }
-        private void UpdateSelectedLabel()
-        {
-            if (dgvProductInfo.SelectedRows.Count == 1)
-            {
-                string productId = dgvProductInfo.SelectedRows[0].Cells[0].Value?.ToString();
-                string productName = dgvProductInfo.SelectedRows[0].Cells[1].Value?.ToString();
-
-                lblSearch.Text = "Selected: " + productId + " - " + productName;
-                lblSearch.ForeColor = Color.Green;
-                lblSearch.Visible = true;
-            }
-            else
-            {
-                lblSearch.Text = "";
-                lblSearch.Visible = false;
-            }
-        }
-
-
-
-
-
-
-        private void propulateProductName()
-        {
-            string sql = @"select PRODUCT_ID, PRODUCT_NAME, IS_AVAILABLE from ProductInfo 
-                            WHERE IS_AVAILABLE = 1;";
-            var dataTable = this.DbConnection.ExecuteQueryTable(sql);
-
-            cmbProduct.DataSource = dataTable;
-            cmbProduct.DisplayMember = "PRODUCT_NAME";
-            cmbProduct.ValueMember = "PRODUCT_ID";
-            cmbProduct.SelectedIndex = -1;
-        }
-
-        private void propulateCustomerMobile()
-        {
-            string query = "select CUSTOMER_ID, CUSTOMER_MOBILE from CustomerInfo;";
-            var dataTableCustomer = this.DbConnection.ExecuteQueryTable(query);
-
-            cmbNumber.DataSource = dataTableCustomer;
-            cmbNumber.DisplayMember = "CUSTOMER_MOBILE";
-            cmbNumber.ValueMember = "CUSTOMER_ID";
-            cmbNumber.SelectedIndex = -1;
-        }
-
-
 
         private void FormAddSales_Load(object sender, EventArgs e)
         {
             dgvProductInfo.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvProductInfo.MultiSelect = false;
-            dgvProductInfo.ClearSelection();
 
-            lblSearch.Text = "";
+            HideLabel(lblSearch);
             lblPremiumMember.Visible = false;
-            lblSearch.Visible = false;
-
-            lblDateDefault.Text = DateTime.Now.ToShortDateString();
+            lblDateDefault.Text = DateTime.Today.ToShortDateString();
 
             try
             {
-                this.propulateProductName();
-                this.propulateCustomerMobile();
+                LoadProducts();
+                LoadCustomers();
             }
-            catch (Exception exc)
+            catch (Exception ex)
             {
-                MessageBox.Show("An error has occurred.\n" + exc.Message);
+                Msg.DatabaseError(ex);
             }
             isFormLoaded = true;
-
         }
 
+        // ---------- combo boxes ----------
 
-
-        private void txtQuantity_TextChanged(object sender, EventArgs e)
+        // Fills a combo box from a query and leaves nothing selected.
+        // isFormLoaded is switched off meanwhile, so the change events do not run.
+        private void FillComboBox(ComboBox comboBox, string sql, string display, string value)
         {
-            int quantity = this.txtQuantity.Text == "" ? 0 : Convert.ToInt32(this.txtQuantity.Text);
-            double unitPrice = this.txtUnitPrice.Text == "" ? 0 : Convert.ToDouble(this.txtUnitPrice.Text);
+            bool wasLoaded = isFormLoaded;
+            isFormLoaded = false;
 
-            int stock = this.txtAvailableStocks.Text == "" ? 0 : Convert.ToInt32(this.txtAvailableStocks.Text);
+            comboBox.DataSource = Db.GetTable(sql);
+            comboBox.DisplayMember = display;
+            comboBox.ValueMember = value;
+            comboBox.SelectedIndex = -1;
 
-            if (quantity > stock)
-            {
-                MessageBox.Show(
-                "The entered quantity exceeds the available stock.\n\nPlease enter a smaller quantity.",
-                "Invalid Quantity",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning
-            );
-
-                this.txtQuantity.Text = "";
-                this.cmbProduct.SelectedIndex = -1;
-                this.txtUnitPrice.Text = "";
-                return;
-            }
-
-
-            double total = quantity * unitPrice;
-
-            this.txtItemTotal.Text = total.ToString();
+            isFormLoaded = wasLoaded;
         }
 
+        // only products that are available and still in stock can be sold
+        private void LoadProducts()
+        {
+            FillComboBox(cmbProduct,
+                "SELECT PRODUCT_ID, PRODUCT_NAME FROM ProductInfo WHERE IS_AVAILABLE = 1 AND QUANTITY > 0 ORDER BY PRODUCT_NAME",
+                "PRODUCT_NAME", "PRODUCT_ID");
+        }
+
+        private void LoadCustomers()
+        {
+            FillComboBox(cmbNumber, "SELECT CUSTOMER_ID, CUSTOMER_MOBILE FROM CustomerInfo ORDER BY CUSTOMER_MOBILE",
+                         "CUSTOMER_MOBILE", "CUSTOMER_ID");
+        }
+
+        // Called by the Add Customer form after a new premium customer is saved
+        public void ReloadCustomers(string mobileToSelect)
+        {
+            LoadCustomers();
+            cmbNumber.Text = mobileToSelect;   // fills the name and shows "Premium Member"
+        }
+
+        private string SelectedProductId()
+        {
+            if (cmbProduct.SelectedIndex < 0 || cmbProduct.SelectedValue == null) return null;
+            return cmbProduct.SelectedValue.ToString();
+        }
+
+        // ---------- customer ----------
+
+        private void txtCustomerName_TextChanged(object sender, EventArgs e)
+        {
+            UserValidator.ValidateFullName(txtCustomerName, lblFullNameError);
+        }
+
+        // When the mobile number belongs to a saved customer, the name is filled in
+        // and the customer is shown as a premium member.
+        private void cmbNumber_TextChanged(object sender, EventArgs e)
+        {
+            if (!isFormLoaded) return;
+
+            isPremiumCustomer = false;
+            txtCustomerName.Text = "";
+            lblPremiumMember.Visible = false;
+
+            if (!UserValidator.ValidateMobileComboBox(cmbNumber, lblMobileError)) return;
+
+            try
+            {
+                DataTable customer = Db.GetTable("SELECT CUSTOMER_NAME FROM CustomerInfo WHERE CUSTOMER_MOBILE = @Mobile",
+                                                 Db.P("@Mobile", cmbNumber.Text.Trim()));
+                isPremiumCustomer = customer.Rows.Count > 0;
+
+                if (isPremiumCustomer)
+                    txtCustomerName.Text = customer.Rows[0]["CUSTOMER_NAME"].ToString();
+
+                lblPremiumMember.Text = isPremiumCustomer ? "Premium Member" : "Non Premium Member";
+                lblPremiumMember.ForeColor = isPremiumCustomer ? Color.Green : Color.Red;
+                lblPremiumMember.Visible = true;
+            }
+            catch (Exception ex)
+            {
+                Msg.DatabaseError(ex);
+            }
+        }
+
+        private void btnAddCustomer_Click(object sender, EventArgs e)
+        {
+            GoTo(new FormAddCustomer(this));
+        }
+
+        // ---------- product and cart ----------
+
+        // How many pieces of a product are already in the cart
+        private int QuantityInCart(string productId)
+        {
+            DataGridViewRow row = FindCartRow(productId);
+            return row == null ? 0 : Convert.ToInt32(row.Cells["PRODUCT_QUANTITY"].Value);
+        }
+
+        private DataGridViewRow FindCartRow(string productId)
+        {
+            foreach (DataGridViewRow row in dgvProductInfo.Rows)
+            {
+                if (row.Cells["PRODUCT_ID"].Value?.ToString() == productId)
+                    return row;
+            }
+            return null;
+        }
+
+        private void cmbProduct_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string productId = SelectedProductId();
+            if (!isFormLoaded || productId == null) return;
+
+            try
+            {
+                DataTable product = Db.GetTable("SELECT UNITPRICE, QUANTITY FROM ProductInfo WHERE PRODUCT_ID = @ID", Db.P("@ID", productId));
+                if (product.Rows.Count == 0) return;
+
+                // stock that is still free = stock in the database - pieces already in the cart
+                int stockLeft = Convert.ToInt32(product.Rows[0]["QUANTITY"]) - QuantityInCart(productId);
+
+                txtUnitPrice.Text = Convert.ToDecimal(product.Rows[0]["UNITPRICE"]).ToString("0.##");
+                txtAvailableStocks.Text = stockLeft.ToString();
+                txtQuantity_TextChanged(sender, e);   // update the item total
+            }
+            catch (Exception ex)
+            {
+                Msg.DatabaseError(ex);
+            }
+        }
+
+        // only digits can be typed in the quantity box
         private void txtQuantity_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar))
-            {
                 e.Handled = true;
-            }
         }
 
-        private void btnClear_Click(object sender, EventArgs e)
+        private void txtQuantity_TextChanged(object sender, EventArgs e)
         {
-            ClearAllFields();
+            txtItemTotal.Text = "";
+            if (txtQuantity.Text == "") return;
 
-        }
-
-        private void txtFinalAmount_TextChanged(object sender, EventArgs e)
-        {
-            CalculateNetPayable();
-        }
-
-        private void txtDiscount_TextChanged_1(object sender, EventArgs e)
-        {
-            if (double.TryParse(txtDiscount.Text, out double discount))
+            if (SelectedProductId() == null)
             {
-                if (discount < 0 || discount > 100)
-                {
-                    MessageBox.Show(
-                    "Discount must be a value between 0 and 100.",
-                    "Invalid Discount",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
+                Msg.Warning("Please select a product first.", "Product Required");
+                txtQuantity.Text = "";
+                return;
+            }
 
-                    txtDiscount.Text = "";
+            int.TryParse(txtQuantity.Text, out int quantity);
+            int.TryParse(txtAvailableStocks.Text, out int stock);
+            decimal.TryParse(txtUnitPrice.Text, out decimal unitPrice);
+
+            if (quantity > stock)
+            {
+                Msg.Warning("The entered quantity exceeds the available stock (" + stock + ").\n\nPlease enter a smaller quantity.", "Invalid Quantity");
+                txtQuantity.Text = "";
+                return;
+            }
+
+            txtItemTotal.Text = (quantity * unitPrice).ToString("0.##");
+        }
+
+        private void btnAddItem_Click(object sender, EventArgs e)
+        {
+            string productId = SelectedProductId();
+            if (productId == null)
+            {
+                Msg.Warning("Please select a product before adding an item.", "Product Required");
+                return;
+            }
+
+            if (!int.TryParse(txtQuantity.Text, out int quantity) || quantity <= 0)
+            {
+                Msg.Warning("Please enter the quantity to add.", "Quantity Required");
+                return;
+            }
+
+            try
+            {
+                DataTable product = Db.GetTable(
+                    "SELECT PRODUCT_ID, PRODUCT_NAME, UNITPRICE, QUANTITY, CREATED_DATE FROM ProductInfo WHERE PRODUCT_ID = @ID",
+                    Db.P("@ID", productId));
+
+                if (product.Rows.Count != 1)
+                {
+                    Msg.Error("The selected product could not be found. Please refresh and try again.", "Product Not Found");
+                    return;
+                }
+
+                DataRow p = product.Rows[0];
+                decimal unitPrice = Convert.ToDecimal(p["UNITPRICE"]);
+                DataGridViewRow cartRow = FindCartRow(productId);
+
+                if (cartRow != null)
+                {
+                    // the product is already in the cart: just add to its quantity
+                    int newQuantity = Convert.ToInt32(cartRow.Cells["PRODUCT_QUANTITY"].Value) + quantity;
+                    cartRow.Cells["PRODUCT_QUANTITY"].Value = newQuantity;
+                    cartRow.Cells["TOTAL"].Value = newQuantity * unitPrice;
                 }
                 else
                 {
-                    CalculateNetPayable();
+                    // columns: ID, name, stock, unit price, created date, quantity sold, total
+                    dgvProductInfo.Rows.Add(p["PRODUCT_ID"], p["PRODUCT_NAME"], p["QUANTITY"], unitPrice,
+                                            Convert.ToDateTime(p["CREATED_DATE"]).ToShortDateString(),
+                                            quantity, quantity * unitPrice);
                 }
+
+                CalculateTotals();
+                ClearProductInputs();
             }
-            else if (!string.IsNullOrEmpty(txtDiscount.Text))
+            catch (Exception ex)
             {
-                txtDiscount.Text = "";
+                Msg.DatabaseError(ex);
             }
+            dgvProductInfo.ClearSelection();
+        }
+
+        private void ClearProductInputs()
+        {
+            cmbProduct.SelectedIndex = -1;
+            txtUnitPrice.Text = "";
+            txtQuantity.Text = "";
+            txtAvailableStocks.Text = "";
+            txtItemTotal.Text = "";
         }
 
         private void btnRemoveItem_Click(object sender, EventArgs e)
         {
             if (dgvProductInfo.SelectedRows.Count == 0)
             {
-                MessageBox.Show(
-                "Please select an item from the list before removing it.",
-                "No Item Selected",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
-
+                Msg.Info("Please select an item from the list before removing it.", "No Item Selected");
                 return;
             }
 
             int index = dgvProductInfo.SelectedRows[0].Index;
-
             dgvProductInfo.Rows.RemoveAt(index);
+            CalculateTotals();
 
-            CalculateSubTotal();
-            CalculateNetPayable();
-
+            // select the next item so several items can be removed quickly
+            dgvProductInfo.ClearSelection();
             if (dgvProductInfo.Rows.Count > 0)
-            {
-                int newIndex = Math.Min(index, dgvProductInfo.Rows.Count - 1);
-                dgvProductInfo.ClearSelection();
-                dgvProductInfo.Rows[newIndex].Selected = true;
-            }
+                dgvProductInfo.Rows[Math.Min(index, dgvProductInfo.Rows.Count - 1)].Selected = true;
 
             UpdateSelectedLabel();
-        }
-
-        private void btnSaveInvoice_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtCustomerName.Text))
-            {
-                MessageBox.Show(
-                "Please enter the customer's name.",
-                "Customer Name Required",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning
-            );
-
-                return;
-            }
-
-
-            if (string.IsNullOrWhiteSpace(cmbNumber.Text))
-            {
-                MessageBox.Show(
-                "Please select or enter the customer's mobile number.",
-                "Customer Mobile Required",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning
-            );
-
-                return;
-            }
-
-
-            if (dgvProductInfo.Rows.Count == 0)
-            {
-                MessageBox.Show(
-                "Please add at least one product item before saving the invoice.",
-                "No Items Added",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning
-            );
-
-                return;
-            }
-
-
-            string customerName = txtCustomerName.Text.Trim();
-            string customerNumber = cmbNumber.Text;
-
-            try
-            {
-                bool saveInvoice = this.SaveInvoiceDetailsDB();
-                bool saveItems = this.SaveInvoiceItemsDB();
-                bool updateStock = this.UpdateStockQuentity();
-
-                if (saveInvoice && saveItems && updateStock)
-                {
-                    MessageBox.Show(
-                    "Invoice saved successfully and stock quantities have been updated.",
-                    "Saved Successfully",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-
-                }
-                else
-                {
-                    MessageBox.Show(
-                    "Unable to save the invoice. Please check the information and try again.",
-                    "Save Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-
-                    return;
-                }
-            }
-            catch {
-                MessageBox.Show(
-                "An unexpected error occurred while saving the invoice.\n\nPlease try again.",
-                "Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
-            );
-
-                return;
-            }
-
-
-            
-
-            FormInvoicePrint invoicePrint = new FormInvoicePrint(this.DbConnection, InvoiceID, this);
-
-            this.Visible = false;
-            invoicePrint.Visible = true;
-        }
-
-        private string InvoiceID { set; get; }
-        private bool SaveInvoiceDetailsDB()
-        {
-            try
-            {
-                string customerID = "";
-                string customerName = txtCustomerName.Text.Trim();
-                string customerNumber = cmbNumber.Text;
-                string userID = CurrentUserID;
-
-                string invQuery = "select max(INVOICE_ID) from InvoiceDetails;";
-                InvoiceID = this.autoGenarateID(invQuery, "INV-");
-
-                if (this.lblPremiumMember.Text == "Premium Member")
-                {
-                    string query = $@"Select CUSTOMER_ID from CustomerInfo
-                                where CUSTOMER_MOBILE = '{this.cmbNumber.Text}'";
-                    var dataTable = DbConnection.ExecuteQueryTable(query);
-
-                    if (dataTable.Rows.Count == 1)
-                    {
-                        customerID = dataTable.Rows[0]["CUSTOMER_ID"].ToString();
-                    }
-                    else
-                    {
-                        MessageBox.Show(
-                        "Premium customer record was not found for this mobile number.",
-                        "Customer Not Found",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
-                    );
-
-                        return false;
-                    }
-
-                }
-                else
-                {
-                    string CustomerQuery = @"SELECT MAX(Customer_ID)
-                            FROM InvoiceDetails
-                             WHERE Customer_ID LIKE 'RC-%';";
-                            
-                    customerID = this.autoGenarateID(CustomerQuery, "RC-");
-                }
-
-                double totalAmount = txtTotalAmount.Text == "" ? 0 : Convert.ToDouble(txtTotalAmount.Text);
-                double finalAmount = txtFinalAmount.Text == "" ? 0 : Convert.ToDouble(txtFinalAmount.Text);
-
-                double discount = txtDiscount.Text == "" ? 0 : Convert.ToDouble(txtDiscount.Text);
-                double discountAmount = (totalAmount * discount) / 100;
-
-                DateTime date = DateTime.Parse(lblDateDefault.Text);
-                string formattedDate = date.ToString("yyyy-MM-dd");
-
-                string insertQuery = $@"
-                INSERT INTO InvoiceDetails
-                (INVOICE_ID, USER_ID, CUSTOMER_ID, CUSTOMER_NAME, CUSTOMER_MOBILE, TOTAL_AMOUNT, DISCOUNT_AMOUNT, FINAL_AMOUNT, INVOICE_DATE)
-                VALUES
-                ('{InvoiceID}','{userID}','{customerID}','{customerName}',
-                '{customerNumber}','{totalAmount}','{discountAmount}','{finalAmount}',
-                    '{formattedDate}');";
-
-                var count = this.DbConnection.ExecuteDMLQuery(insertQuery);
-                if (count == 1)
-                {
-                    return true;
-                }
-                else
-                {
-                    MessageBox.Show(
-                    "Invoice details could not be saved. Please try again.",
-                    "Save Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-
-                    return false;
-                }
-
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                "A database error occurred while saving invoice details.\n\nPlease try again.\n\nDetails: " + ex.Message,
-                "Database Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
-            );
-
-            }
-            return false;
-
-        }
-
-        private string autoGenarateID(string sql, string prefix)
-        {
-            var newId = "";
-            string query = sql;
-            var dataTable = this.DbConnection.ExecuteQueryTable(query);
-            if (dataTable.Rows.Count == 0 || dataTable.Rows[0][0] == DBNull.Value)
-            {
-                newId = prefix + "001";
-
-            }
-            else
-            {
-
-                var oldId = dataTable.Rows[0][0].ToString();
-                var split = oldId.Split('-');
-                var temp = Convert.ToInt32(split[1]);
-                newId = prefix + (++temp).ToString("d3");
-            }
-            return newId;
-        }
-
-        private bool SaveInvoiceItemsDB()
-        {
-            
-            if (dgvProductInfo.Rows.Count == 0)
-            {
-                MessageBox.Show(
-                "There are no items in the invoice to save.",
-                "No Items",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning
-            );
-
-                return false;
-            }
-
-            foreach (DataGridViewRow row in dgvProductInfo.Rows)
-            {
-
-                if (row.IsNewRow)
-                    continue;
-
-                string productID = row.Cells["Product_ID"].Value.ToString();
-                string productName = row.Cells["Product_Name"].Value.ToString();
-                int quantity = Convert.ToInt32(row.Cells["PRODUCT_QUANTITY"].Value);
-                double unitPrice = Convert.ToDouble(row.Cells["UnitPrice"].Value);
-                double subTotal = Convert.ToDouble(row.Cells["Total"].Value);
-
-                string insertQuery = $@"INSERT INTO InvoiceItems
-                (INVOICE_ID, PRODUCT_ID, PRODUCT_NAME, QUANTITY, UNIT_PRICE, SUB_TOTAL)
-                VALUES
-                ('{InvoiceID}','{productID}','{productName}','{quantity}',
-                '{unitPrice}','{subTotal}');";
-
-                var count = this.DbConnection.ExecuteDMLQuery(insertQuery);
-
-                if (count != 1)
-                {
-                    MessageBox.Show(
-                    "One or more invoice items could not be saved. Please try again.",
-                    "Save Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-
-                    return false;
-                }
-            }
-                return true;
-            
-        }
-
-        private bool UpdateStockQuentity()
-        {
-            foreach (DataGridViewRow row in dgvProductInfo.Rows)
-            {
-                if (row.IsNewRow)
-                    continue;
-
-                string productID = row.Cells["Product_ID"].Value.ToString();
-                int soldQuantity = Convert.ToInt32(row.Cells["PRODUCT_QUANTITY"].Value);
-
-                string updateQuery = $@"
-            UPDATE ProductInfo
-            SET QUANTITY = QUANTITY - {soldQuantity}
-            WHERE PRODUCT_ID = '{productID}';";
-
-                int count = this.DbConnection.ExecuteDMLQuery(updateQuery);
-
-                if (count != 1)
-                {
-                    MessageBox.Show(
-                        "Stock quantity could not be updated for Product ID: " + productID,
-                        "Stock Update Failed",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private void FormAddSales_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            DialogResult result = MessageBox.Show(
-        "Are you sure you want to close the application?",
-        "Confirm Exit",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question
-    );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
-        }
-
-
-
-        private void txtCustomerName_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorUser.ValidateFullName(txtCustomerName, lblFullNameError);
-        }
-
-        private void cmbNumber_TextChanged(object sender, EventArgs e)
-        {
-            if (!isFormLoaded) return;
-
-            bool mobileOk = InputValidatorUser.ValidateMobileComboBox(cmbNumber, lblMobileError);
-
-            txtCustomerName.Text = "";
-            lblPremiumMember.Text = "";
-            lblPremiumMember.Visible = false;
-
-            if (!mobileOk)
-                return;
-
-            string sql = $"select CUSTOMER_NAME from CustomerInfo where CUSTOMER_MOBILE = '{cmbNumber.Text.Trim()}';";
-            var dataTable = this.DbConnection.ExecuteQueryTable(sql);
-
-            if (dataTable.Rows.Count > 0)
-            {
-                txtCustomerName.Text = dataTable.Rows[0]["CUSTOMER_NAME"].ToString();
-                lblPremiumMember.Text = "Premium Member";
-                lblPremiumMember.ForeColor = Color.Green;
-                lblPremiumMember.Visible = true;
-            }
-            else
-            {
-                lblPremiumMember.Text = "Non Premium Member";
-                lblPremiumMember.ForeColor = Color.Red;
-                lblPremiumMember.Visible = true;
-            }
         }
 
         private void dgvProductInfo_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -735,25 +307,199 @@ namespace BanglaProject
 
             dgvProductInfo.ClearSelection();
             dgvProductInfo.Rows[e.RowIndex].Selected = true;
-
             UpdateSelectedLabel();
         }
 
-        private bool isFormLoaded = false;
+        private void UpdateSelectedLabel()
+        {
+            if (dgvProductInfo.SelectedRows.Count == 1)
+            {
+                DataGridViewRow row = dgvProductInfo.SelectedRows[0];
+                ShowSelected(lblSearch, row.Cells["PRODUCT_ID"].Value?.ToString(), row.Cells["PRODUCT_NAME"].Value?.ToString());
+            }
+            else
+            {
+                HideLabel(lblSearch);
+            }
+        }
+
+        // ---------- totals ----------
+
+        private decimal SubTotal()
+        {
+            decimal total = 0;
+            foreach (DataGridViewRow row in dgvProductInfo.Rows)
+                total += Convert.ToDecimal(row.Cells["TOTAL"].Value);
+            return total;
+        }
+
+        private decimal DiscountPercent()
+        {
+            decimal.TryParse(txtDiscount.Text, out decimal percent);
+            return percent;
+        }
+
+        private void CalculateTotals()
+        {
+            decimal subTotal = SubTotal();
+            decimal discountAmount = subTotal * DiscountPercent() / 100;
+
+            txtTotalAmount.Text = subTotal.ToString("0.00");
+            txtFinalAmount.Text = (subTotal - discountAmount).ToString("0.00");
+        }
+
+        // discount is a percentage between 0 and 100
+        private void txtDiscount_TextChanged_1(object sender, EventArgs e)
+        {
+            if (txtDiscount.Text != "")
+            {
+                if (!decimal.TryParse(txtDiscount.Text, out decimal discount))
+                {
+                    txtDiscount.Text = "";
+                    return;   // clearing the box runs this method again
+                }
+
+                if (discount < 0 || discount > 100)
+                {
+                    Msg.Warning("Discount must be a value between 0 and 100.", "Invalid Discount");
+                    txtDiscount.Text = "";
+                    return;
+                }
+            }
+            CalculateTotals();
+        }
+
+        // ---------- save ----------
+
+        private void btnSaveInvoice_Click(object sender, EventArgs e)
+        {
+            if (!UserValidator.ValidateMobileComboBox(cmbNumber, lblMobileError))
+            {
+                Msg.Warning("Please select or enter a correct customer mobile number.", "Customer Mobile Required");
+                return;
+            }
+
+            if (!UserValidator.ValidateFullName(txtCustomerName, lblFullNameError))
+            {
+                Msg.Warning("Please enter the customer's name correctly.", "Customer Name Required");
+                return;
+            }
+
+            if (dgvProductInfo.Rows.Count == 0)
+            {
+                Msg.Warning("Please add at least one product item before saving the invoice.", "No Items Added");
+                return;
+            }
+
+            try
+            {
+                if (!EnoughStock()) return;
+
+                string invoiceId = SaveInvoice();
+                Msg.Info("Invoice saved successfully and stock quantities have been updated.", "Saved Successfully");
+
+                ClearAllFields();
+                LoadProducts();   // stock has changed
+                GoTo(new FormInvoicePrint(invoiceId, this));
+            }
+            catch (Exception ex)
+            {
+                Msg.Error("The invoice could not be saved. Nothing was changed.\n\nDetails: " + ex.Message, "Save Failed");
+            }
+        }
+
+        // Checks the stock again just before saving (another user may have sold the same product)
+        private bool EnoughStock()
+        {
+            foreach (DataGridViewRow row in dgvProductInfo.Rows)
+            {
+                string productId = row.Cells["PRODUCT_ID"].Value.ToString();
+                int wanted = Convert.ToInt32(row.Cells["PRODUCT_QUANTITY"].Value);
+                int stock = Convert.ToInt32(Db.Scalar("SELECT QUANTITY FROM ProductInfo WHERE PRODUCT_ID = @ID", Db.P("@ID", productId)));
+
+                if (wanted > stock)
+                {
+                    Msg.Warning("Only " + stock + " left of " + row.Cells["PRODUCT_NAME"].Value + ". Please change the quantity.", "Not Enough Stock");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Saves the invoice, its items and the new stock in one transaction and returns the invoice ID
+        private string SaveInvoice()
+        {
+            string mobile = cmbNumber.Text.Trim();
+            string invoiceId = Db.NextId("InvoiceDetails", "INVOICE_ID", "INV-");
+
+            // premium customers keep their PC-xxx ID, other customers get a new RC-xxx ID
+            string customerId = isPremiumCustomer
+                ? Db.Scalar("SELECT CUSTOMER_ID FROM CustomerInfo WHERE CUSTOMER_MOBILE = @Mobile", Db.P("@Mobile", mobile)).ToString()
+                : Db.NextId("InvoiceDetails", "CUSTOMER_ID", "RC-");
+
+            decimal subTotal = SubTotal();
+            decimal discountAmount = subTotal * DiscountPercent() / 100;
+
+            List<SqlCommand> commands = new List<SqlCommand>();
+
+            commands.Add(Db.Command(
+                "INSERT INTO InvoiceDetails (INVOICE_ID, USER_ID, CUSTOMER_ID, CUSTOMER_NAME, CUSTOMER_MOBILE, TOTAL_AMOUNT, DISCOUNT_AMOUNT, FINAL_AMOUNT, INVOICE_DATE) " +
+                "VALUES (@Invoice, @User, @Customer, @Name, @Mobile, @Total, @Discount, @Final, @Date)",
+                Db.P("@Invoice", invoiceId), Db.P("@User", userId), Db.P("@Customer", customerId),
+                Db.P("@Name", txtCustomerName.Text.Trim()), Db.P("@Mobile", mobile),
+                Db.P("@Total", subTotal), Db.P("@Discount", discountAmount),
+                Db.P("@Final", subTotal - discountAmount), Db.P("@Date", DateTime.Today)));
+
+            foreach (DataGridViewRow row in dgvProductInfo.Rows)
+            {
+                object productId = row.Cells["PRODUCT_ID"].Value;
+                object quantity = row.Cells["PRODUCT_QUANTITY"].Value;
+
+                commands.Add(Db.Command(
+                    "INSERT INTO InvoiceItems (INVOICE_ID, PRODUCT_ID, PRODUCT_NAME, QUANTITY, UNIT_PRICE, SUB_TOTAL) " +
+                    "VALUES (@Invoice, @Product, @Name, @Qty, @Price, @SubTotal)",
+                    Db.P("@Invoice", invoiceId), Db.P("@Product", productId), Db.P("@Name", row.Cells["PRODUCT_NAME"].Value),
+                    Db.P("@Qty", quantity), Db.P("@Price", row.Cells["UNITPRICE"].Value), Db.P("@SubTotal", row.Cells["TOTAL"].Value)));
+
+                commands.Add(Db.Command(
+                    "UPDATE ProductInfo SET QUANTITY = QUANTITY - @Qty WHERE PRODUCT_ID = @Product",
+                    Db.P("@Qty", quantity), Db.P("@Product", productId)));
+            }
+
+            Db.ExecuteInTransaction(commands);
+            return invoiceId;
+        }
+
+        // ---------- clear and back ----------
+
+        private void ClearAllFields()
+        {
+            isFormLoaded = false;   // so clearing the mobile box does not search again
+            cmbNumber.SelectedIndex = -1;
+            cmbNumber.Text = "";
+            isFormLoaded = true;
+
+            txtCustomerName.Text = "";
+            isPremiumCustomer = false;
+            lblPremiumMember.Visible = false;
+            ValidationLabel.Reset(lblFullNameError, lblMobileError);
+
+            ClearProductInputs();
+            dgvProductInfo.Rows.Clear();
+            txtDiscount.Text = "";
+            txtTotalAmount.Text = "";
+            txtFinalAmount.Text = "";
+            HideLabel(lblSearch);
+        }
+
+        private void btnClear_Click(object sender, EventArgs e)
+        {
+            ClearAllFields();
+        }
 
         private void btnBack_Click_1(object sender, EventArgs e)
         {
-            if (this.Employee != null)
-            {
-                this.Visible = false;
-                this.Employee.Visible = true;
-
-            }
-            else if (this.AdminView != null)
-            {
-                this.Visible = false;
-                this.AdminView.Visible = true;
-            }
+            GoTo(dashboard);
         }
     }
 }

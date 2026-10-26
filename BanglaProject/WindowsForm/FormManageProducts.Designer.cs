@@ -522,7 +522,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormManageProducts";
             this.Text = "FormManageProducts";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormManageProducts_FormClosing);
             this.Load += new System.EventHandler(this.FormManageProducts_Load);
             this.panelTitleNameAdmin.ResumeLayout(false);
             this.panelTitleNameAdmin.PerformLayout();

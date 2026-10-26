@@ -627,9 +627,8 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.Name = "FormEditUser";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "FormEditUser";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormEditUser_FormClosing);
             this.Load += new System.EventHandler(this.FormEditUser_Load);
             this.panel1.ResumeLayout(false);
             this.panelTitleNameAdmin.ResumeLayout(false);

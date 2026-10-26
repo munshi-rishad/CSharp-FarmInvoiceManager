@@ -1,234 +1,111 @@
-﻿using BanglaProject.DataBase;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Xml.Linq;
+﻿using System;
+using BanglaProject.Data;
+using BanglaProject.Helpers;
+using BanglaProject.Validation;
 
 namespace BanglaProject
 {
-    public partial class FormAddProduct : Form
+    // Admin adds a new product. The product ID (FIM-001, FIM-002 ...) is made automatically.
+    public partial class FormAddProduct : BaseForm
     {
+        private readonly FormManageProducts manageProducts;
+        private readonly string adminUserId;
+
         public FormAddProduct()
         {
             InitializeComponent();
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-
         }
 
-        private FormManageProducts ManageProducts { get; set; }
-        private DataBaseConnection DbConnection { get; set; }
-
-        public FormAddProduct(DataBaseConnection DbConnection, FormManageProducts address) : this()
+        public FormAddProduct(string adminUserId, FormManageProducts manageProducts) : this()
         {
-            this.ManageProducts = address;
-            this.DbConnection = DbConnection;
-        }
-
-        private void btnCancle_Click(object sender, EventArgs e)
-        {
-            this.Visible = false;
-            this.ManageProducts.Visible = true;
+            this.adminUserId = adminUserId;
+            this.manageProducts = manageProducts;
         }
 
         private void FormAddProduct_Load(object sender, EventArgs e)
         {
-            lblNameError.Text = "";
-            lblQuantityError.Text = "";
-            lblCategoryError.Text = "";
-            lblPriceError.Text = "";
-            lblDateError.Text = "";
-            lblStatusError.Text = "";
-
-            lblNameError.Visible = false;
-            lblQuantityError.Visible = false;
-            lblCategoryError.Visible = false;
-            lblPriceError.Visible = false;
-            lblDateError.Visible = false;
-            lblStatusError.Visible = false;
+            ResetErrors();
         }
 
-        private void FormAddProduct_FormClosing(object sender, FormClosingEventArgs e)
+        private void ResetErrors()
         {
-            DialogResult result = MessageBox.Show(
-        "Are you sure you want to close the application?",
-        "Confirm Exit",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question
-    );
-
-            if (result == DialogResult.No)
-                e.Cancel = true;
-            else
-                Environment.Exit(0);
+            ValidationLabel.Reset(lblNameError, lblQuantityError, lblCategoryError, lblPriceError, lblDateError, lblStatusError);
         }
 
-        private void txtProductName_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorProduct.ValidateName(txtProductName, lblNameError);
-        }
+        // live validation while typing
+        private void txtProductName_TextChanged(object sender, EventArgs e) => ProductValidator.ValidateName(txtProductName, lblNameError);
+        private void txtQunatity_TextChanged(object sender, EventArgs e) => ProductValidator.ValidateQuantity(txtQunatity, lblQuantityError);
+        private void txtCategory_TextChanged(object sender, EventArgs e) => ProductValidator.ValidateCategory(txtCategory, lblCategoryError);
+        private void txtPrice_TextChanged(object sender, EventArgs e) => ProductValidator.ValidatePrice(txtPrice, lblPriceError);
+        private void dtpDate_ValueChanged(object sender, EventArgs e) => ProductValidator.ValidateDate(dtpDate, lblDateError);
+        private void chkIsActive_CheckedChanged(object sender, EventArgs e) => ProductValidator.ValidateStatus(chkIsActive, lblStatusError);
 
-        private void txtQunatity_TextChanged(object sender, EventArgs e)
+        private bool AllFieldsValid()
         {
-            InputValidatorProduct.ValidateQuantity(txtQunatity, lblQuantityError);
-        }
-
-        private void txtCategory_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorProduct.ValidateCategory(txtCategory, lblCategoryError);
-        }
-
-        private void txtPrice_TextChanged(object sender, EventArgs e)
-        {
-            InputValidatorProduct.ValidatePrice(txtPrice, lblPriceError);
-        }
-
-        private void dtpDate_ValueChanged(object sender, EventArgs e)
-        {
-            InputValidatorProduct.ValidateDate(dtpDate, lblDateError);
-        }
-
-        private void chkIsActive_CheckedChanged(object sender, EventArgs e)
-        {
-            InputValidatorProduct.ValidateStatus(chkIsActive, lblStatusError);
-        }
-        private bool HasRedError()
-        {
-            if (lblNameError.Visible && lblNameError.ForeColor == Color.Red) return true;
-            if (lblQuantityError.Visible && lblQuantityError.ForeColor == Color.Red) return true;
-            if (lblCategoryError.Visible && lblCategoryError.ForeColor == Color.Red) return true;
-            if (lblPriceError.Visible && lblPriceError.ForeColor == Color.Red) return true;
-            if (lblDateError.Visible && lblDateError.ForeColor == Color.Red) return true;
-            if (lblStatusError.Visible && lblStatusError.ForeColor == Color.Red) return true;
-
-            return false;
+            bool ok = true;
+            ok &= ProductValidator.ValidateName(txtProductName, lblNameError);
+            ok &= ProductValidator.ValidateQuantity(txtQunatity, lblQuantityError);
+            ok &= ProductValidator.ValidateCategory(txtCategory, lblCategoryError);
+            ok &= ProductValidator.ValidatePrice(txtPrice, lblPriceError);
+            ok &= ProductValidator.ValidateDate(dtpDate, lblDateError);
+            ok &= ProductValidator.ValidateStatus(chkIsActive, lblStatusError);
+            return ok;
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            if (HasRedError())
+            if (!AllFieldsValid())
             {
-                MessageBox.Show(
-                    "Please fix the highlighted errors before saving.",
-                    "Validation Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
+                Msg.Warning("Please fix the highlighted errors before saving.", "Validation Error");
                 return;
             }
 
-            //bool nameOk = InputValidatorProduct.ValidateName(txtProductName, lblNameError);
-            //bool qtyOk = InputValidatorProduct.ValidateQuantity(txtQunatity, lblQuantityError);
-            //bool catOk = InputValidatorProduct.ValidateCategory(txtCategory, lblCategoryError);
-            //bool priceOk = InputValidatorProduct.ValidatePrice(txtPrice, lblPriceError);
-            //bool dateOk = InputValidatorProduct.ValidateDate(dtpDate, lblDateError);
-            //bool statusOk = InputValidatorProduct.ValidateStatus(chkIsActive, lblStatusError);
-
-            //if (!(nameOk && qtyOk && catOk && priceOk && dateOk && statusOk))
-            //{
-            //    MessageBox.Show(
-            //        "Please fix the highlighted errors before saving.",
-            //        "Validation Error",
-            //        MessageBoxButtons.OK,
-            //        MessageBoxIcon.Warning
-            //    );
-            //    return;
-            //}
-
             try
             {
-                string productId = GenerateProductId();
+                string productId = Db.NextId("ProductInfo", "PRODUCT_ID", "FIM-");
 
-                int quantity = int.Parse(txtQunatity.Text.Trim());
-                int price = int.Parse(txtPrice.Text.Trim());
+                Db.Execute(
+                    "INSERT INTO ProductInfo (PRODUCT_ID, PRODUCT_NAME, QUANTITY, CATEGORY_NAME, UNITPRICE, CREATED_DATE, IS_AVAILABLE, CREATED_BY_USER_ID) " +
+                    "VALUES (@ID, @Name, @Qty, @Category, @Price, @Date, @Available, @CreatedBy)",
+                    Db.P("@ID", productId),
+                    Db.P("@Name", txtProductName.Text.Trim()),
+                    Db.P("@Qty", int.Parse(txtQunatity.Text.Trim())),
+                    Db.P("@Category", txtCategory.Text.Trim()),
+                    Db.P("@Price", int.Parse(txtPrice.Text.Trim())),
+                    Db.P("@Date", dtpDate.Value.Date),
+                    Db.P("@Available", chkIsActive.Checked),
+                    Db.P("@CreatedBy", adminUserId));   // the admin who is logged in
 
-                string sql = @"
-                    INSERT INTO ProductInfo
-                     (PRODUCT_ID, PRODUCT_NAME, QUANTITY, CATEGORY_NAME, UNITPRICE,
-                     CREATED_DATE, IS_AVAILABLE, CREATED_BY_USER_ID)
-                      VALUES
-                    (@ID,@NAME,@QTY,@CAT,@PRICE,@DATE,@STATUS,@CREATED_BY_USER_ID)";
-
-                int result = DbConnection.ExecuteDMLQuery(sql,
-                    new SqlParameter("@ID", productId),
-                    new SqlParameter("@NAME", txtProductName.Text.Trim()),
-                    new SqlParameter("@QTY", quantity),
-                    new SqlParameter("@CAT", txtCategory.Text.Trim()),
-                    new SqlParameter("@PRICE", price),
-                    new SqlParameter("@DATE", dtpDate.Value.Date),
-                    new SqlParameter("@STATUS", chkIsActive.Checked),
-                    new SqlParameter("@CREATED_BY_USER_ID", "A-001")
-                );
-
-                if (result > 0)
-                {
-                    MessageBox.Show(
-                        "Product saved successfully!",
-                        "Success",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
-
-                    btnClear_Click(sender, e);
-
-                    this.Visible = false;
-                    ManageProducts.Visible = true;
-                }
-                else
-                {
-                    MessageBox.Show(
-                        "Insert failed!",
-                        "Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                }
+                Msg.Info("Product saved successfully! Product ID: " + productId, "Success");
+                ClearForm();
+                manageProducts.LoadProducts();
+                GoTo(manageProducts);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "An error occurred During Insertion: " + ex.Message,
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
+                Msg.DatabaseError(ex);
             }
         }
-        private string GenerateProductId()
-        {
-            string sql =
-                "SELECT ISNULL(MAX(CAST(SUBSTRING(PRODUCT_ID,5,10) AS INT)),0) FROM ProductInfo";
 
-            object res = DbConnection.ExecuteScalarQuery(sql);
-            int last = 0;
-            if (res != null) int.TryParse(res.ToString(), out last);
-
-            return "FIM-" + (last + 1).ToString("D3");
-        }
-
-        private void btnClear_Click(object sender, EventArgs e)
+        private void ClearForm()
         {
             txtProductName.Clear();
             txtQunatity.Clear();
             txtCategory.Clear();
             txtPrice.Clear();
-
+            dtpDate.Value = DateTime.Today;
             chkIsActive.Checked = false;
+            ResetErrors();
+        }
 
-            lblNameError.Visible = false;
-            lblQuantityError.Visible = false;
-            lblCategoryError.Visible = false;
-            lblPriceError.Visible = false;
-            lblDateError.Visible = false;
-            lblStatusError.Visible = false;
+        private void btnClear_Click(object sender, EventArgs e)
+        {
+            ClearForm();
+        }
+
+        private void btnCancle_Click(object sender, EventArgs e)
+        {
+            GoTo(manageProducts);
         }
     }
 }

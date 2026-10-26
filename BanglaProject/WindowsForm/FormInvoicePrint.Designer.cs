@@ -151,7 +151,6 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FormInvoicePrint";
             this.Text = "FormInvoicePrint";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormInvoicePrint_FormClosing);
             this.Load += new System.EventHandler(this.FormInvoicePrint_Load);
             this.panelTitleNameAdmin.ResumeLayout(false);
             this.panelTitleNameAdmin.PerformLayout();
