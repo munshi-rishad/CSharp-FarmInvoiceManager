@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Windows.Forms;
 using BanglaProject.Data;
@@ -19,7 +19,7 @@ namespace BanglaProject
         private void btnLogin_Click(object sender, EventArgs e)
         {
             string username = txtUsername.Text.Trim();
-            string password = txtPassword.Text;
+            string password = txtPassword.Text.Trim();   // passwords never contain spaces
 
             if (username == "" || password == "")
             {
@@ -37,7 +37,7 @@ namespace BanglaProject
 
                 if (user.Rows.Count == 0)
                 {
-                    Msg.Error("Login failed. The username/User ID or password you entered is incorrect.", "Login Failed");
+                    ShowLoginProblem(username);
                     return;
                 }
 
@@ -72,6 +72,27 @@ namespace BanglaProject
             {
                 Msg.Error("Something went wrong while trying to log you in.\n\nPlease try again.\n\nDetails: " + ex.Message, "Login Error");
             }
+        }
+
+        // Explains why the login failed: empty database, unknown user or wrong password
+        private void ShowLoginProblem(string username)
+        {
+            int totalUsers = Convert.ToInt32(Db.Scalar("SELECT COUNT(*) FROM UserInfo"));
+            if (totalUsers == 0)
+            {
+                Msg.Error("There are no users in the database (" + Db.ServerAndDatabase() + ").\n\n" +
+                          "Run Database/FarmInvoiceManager.sql in SSMS, or check the connection string in App.config.",
+                          "Database Is Empty");
+                return;
+            }
+
+            int found = Convert.ToInt32(Db.Scalar(
+                "SELECT COUNT(*) FROM UserInfo WHERE USERNAME = @User OR USER_ID = @User", Db.P("@User", username)));
+
+            if (found == 0)
+                Msg.Error("No account was found with this username or User ID.", "Login Failed");
+            else
+                Msg.Error("The password you entered is incorrect.", "Login Failed");
         }
 
         private void btnClear_Click(object sender, EventArgs e)

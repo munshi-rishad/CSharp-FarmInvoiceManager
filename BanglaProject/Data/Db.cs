@@ -105,6 +105,13 @@ namespace BanglaProject.Data
             return prefix + (last + 1).ToString("D3");
         }
 
+        // "server / database" from the connection string, shown in error messages
+        public static string ServerAndDatabase()
+        {
+            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(ConnectionString);
+            return "server: " + builder.DataSource + ", database: " + builder.InitialCatalog;
+        }
+
         // Short way to make a parameter: Db.P("@ID", id)
         public static SqlParameter P(string name, object value)
         {
