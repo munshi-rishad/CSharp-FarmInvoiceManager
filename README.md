@@ -5,6 +5,8 @@ It manages users, products, customers and sales, prints invoices and shows a sal
 
 OOP2 (CSC2210) project, AIUB.
 
+**Semester:** Fall 2025-2026 (Object Oriented Programming 2)
+
 ## Features
 
 - Login for **admin** and **employee** with different dashboards.
